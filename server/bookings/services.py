@@ -81,6 +81,17 @@ def find_conflicts(tutor, slots, exclude_booking=None):
     return conflicts
 
 
+def lock_tutor_calendar(tutor):
+    """
+    Serialise every operation that claims time on this tutor's calendar (new booking, reassignment,
+    replacement, reschedule), so the conflict check and the insert can't interleave between requests.
+    Must be the first query in the transaction.
+    """
+    from tutors.models import TutorProfile
+
+    return TutorProfile.objects.select_for_update().select_related("user").get(pk=tutor.pk)
+
+
 def check_availability(tutor, schedule, lesson_minutes):
     slots = list(tutor.availability.all())
     for slot in schedule:
@@ -93,6 +104,7 @@ def check_availability(tutor, schedule, lesson_minutes):
 def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minutes, schedule, start_date, request=None, address="", area=None, is_online=False):
     from tutors.models import TutorStatus
 
+    tutor = lock_tutor_calendar(tutor)
     if tutor.status != TutorStatus.ACTIVE or tutor.user.suspended_at:
         raise ValidationError("This tutor is not currently available.")
     if child.parent_id != parent.pk:
@@ -227,6 +239,11 @@ def reassign(booking):
     previous = booking.tutor
     booking.declined_tutor_ids = sorted(set(booking.declined_tutor_ids) | {previous.pk})
     nxt = _next_tutor(booking)
+    if nxt is not None:
+        nxt = lock_tutor_calendar(nxt)
+        slots = [(lsn.scheduled_start, lsn.scheduled_end) for lsn in booking.lessons.filter(status=LessonStatus.SCHEDULED)]
+        if find_conflicts(nxt, slots, exclude_booking=booking):
+            nxt = None  # taken by a concurrent booking since we looked
     if nxt is None:
         booking.status = BookingStatus.REASSIGNING
         booking.offer_expires_at = None
@@ -280,6 +297,7 @@ def replace_tutor(booking, new_tutor, by_user, reason=""):
     for l in remaining:
         l.status, l.escrow_status, l.cancelled_at, l.cancelled_by, l.cancel_reason = LessonStatus.CANCELLED, EscrowStatus.REFUNDED, timezone.now(), "staff", "Tutor replaced"
         l.save()
+    new_tutor = lock_tutor_calendar(new_tutor)
     new_price = lesson_price(new_tutor.hourly_rate_kobo, booking.lesson_minutes)
     count = min(len(remaining), balance // new_price) if new_price else 0
     if count < 1:
@@ -446,6 +464,7 @@ def cancel_lesson(lesson, by_user, reason=""):
 
 @transaction.atomic
 def reschedule_lesson(lesson, by_user, new_start):
+    lock_tutor_calendar(lesson.tutor)
     lesson = _lock_lesson(lesson)
     if lesson.status != LessonStatus.SCHEDULED:
         raise ValidationError("Only upcoming lessons can be rescheduled.")
