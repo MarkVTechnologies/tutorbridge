@@ -123,9 +123,13 @@ def vetting_queue(request):
 @api_view(["GET"])
 @permission_classes([staff_perm("vetting.view")])
 def vetting_detail(request, pk):
+    return Response(_vetting_json(pk))
+
+
+def _vetting_json(pk):
     t = get_object_or_404(TutorProfile.objects.select_related("user"), pk=pk)
     checks = {c.check_type: c for c in t.checks.select_related("reviewer")}
-    return Response({
+    return {
         "profile": TutorOwnProfileSerializer(t).data,
         "user": {**_user_brief(t.user), "gender": t.user.gender, "email_verified": bool(t.user.email_verified_at), "phone_verified": bool(t.user.phone_verified_at)},
         "progress": tutor_services.onboarding_progress(t),
@@ -150,7 +154,7 @@ def vetting_detail(request, pk):
                     for h in t.status_history.select_related("changed_by")],
         "approval_blockers": tutor_services.approval_blockers(t),
         "strikes": [{"reason": s.reason, "notes": s.notes, "at": s.created_at} for s in t.strike_records.all()],
-    })
+    }
 
 
 @api_view(["POST"])
@@ -163,7 +167,7 @@ def vetting_check(request, pk):
     if status == CheckStatus.FAILED and not request.data.get("notes"):
         raise ValidationError({"notes": "Give a reason."})
     vetting_services.decide_check(t, ct, status, request.user, request.data.get("notes", ""), request=request)
-    return vetting_detail(request._request, pk)
+    return Response(_vetting_json(pk))
 
 
 @api_view(["POST"])
@@ -207,7 +211,7 @@ def vetting_decision(request, pk):
         tutor_services.set_status(t, TutorStatus.UNDER_REVIEW, request.user, reason)
     else:
         raise ValidationError({"decision": "Unknown decision."})
-    return vetting_detail(request._request, pk)
+    return Response(_vetting_json(pk))
 
 
 @api_view(["GET", "POST"])
@@ -407,15 +411,19 @@ def bookings_list(request):
 @api_view(["GET"])
 @permission_classes([staff_perm("bookings.view")])
 def booking_detail(request, pk):
+    return Response(_booking_json(request, pk))
+
+
+def _booking_json(request, pk):
     b = get_object_or_404(Booking.objects.select_related("parent__user", "tutor__user", "child"), pk=pk)
     lessons = b.lessons.select_related("booking__parent", "tutor__user", "booking__child")
-    return Response({
+    return {
         "id": b.pk, "status": b.status, "parent": _user_brief(b.parent.user), "tutor": {**_user_brief(b.tutor.user), "tutor_id": b.tutor_id},
         "child": b.child.first_name, "subjects": [s.name for s in b.subjects.all()], "package_size": b.package_size, "lesson_minutes": b.lesson_minutes,
         "schedule": b.schedule, "total_kobo": b.total_kobo, "commission_pct": str(b.commission_pct), "escrow_balance_kobo": ledger.balance(ledger.escrow(b)),
         "address": b.address, "request": b.request_id, "declined_tutor_ids": b.declined_tutor_ids, "replaces": b.replaces_id,
         "lessons": [{**LessonSerializer(l, context={"request": request}).data, "checkin_lat": l.checkin_lat, "checkin_lng": l.checkin_lng} for l in lessons],
-    })
+    }
 
 
 @api_view(["POST"])
@@ -432,7 +440,7 @@ def booking_action(request, pk, op):
         return Response({"new_booking": new.pk})
     else:
         raise ValidationError("Unknown action.")
-    return booking_detail(request._request, pk)
+    return Response(_booking_json(request, pk))
 
 
 @api_view(["POST"])
@@ -442,6 +450,18 @@ def lesson_no_show(request, pk):
     booking_services.mark_no_show(lesson, by_user=request.user)
     audit(request.user, "lesson.no_show", "lesson", lesson.pk, request=request)
     return Response({"status": "no_show"})
+
+
+@api_view(["POST"])
+@permission_classes([staff_perm("bookings.manage")])
+def lesson_unlock_codes(request, pk):
+    """Reset a lesson's wrong-code counter after support has confirmed who is at the door."""
+    lesson = get_object_or_404(Lesson, pk=pk)
+    before = lesson.code_attempts
+    Lesson.objects.filter(pk=pk).update(code_attempts=0)
+    audit(request.user, "lesson.unlock_codes", "lesson", pk, before={"code_attempts": before}, after={"code_attempts": 0},
+          reason=request.data.get("reason", ""), request=request)
+    return Response({"code_attempts": 0})
 
 
 # --- Finance (OUT-*, PAY-09) ----------------------------------------------

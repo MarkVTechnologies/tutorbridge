@@ -21,6 +21,10 @@ class GatewayError(Exception):
     pass
 
 
+class InvalidPayload(GatewayError):
+    """The webhook body itself is malformed (permanent: retrying won't help)."""
+
+
 @dataclass
 class Verification:
     status: str  # success | failed | pending
@@ -214,4 +218,4 @@ def parse_json(raw_body):
     try:
         return json.loads(raw_body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as e:
-        raise GatewayError("Invalid JSON body") from e
+        raise InvalidPayload("Invalid JSON body") from e

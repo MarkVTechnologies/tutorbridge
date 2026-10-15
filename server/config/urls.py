@@ -139,6 +139,7 @@ api = [
     path("staff/bookings/<int:pk>/", bo.booking_detail),
     path("staff/bookings/<int:pk>/<str:op>/", bo.booking_action),
     path("staff/lessons/<int:pk>/no-show/", bo.lesson_no_show),
+    path("staff/lessons/<int:pk>/unlock-codes/", bo.lesson_unlock_codes),
     path("staff/finance/", bo.finance_summary),
     path("staff/finance/payments/", bo.finance_payments),
     path("staff/finance/reconcile/", bo.run_reconciliation),

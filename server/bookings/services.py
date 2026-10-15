@@ -7,6 +7,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -313,8 +314,31 @@ def _lock_lesson(lesson):
     return Lesson.objects.select_for_update().select_related("booking", "booking__parent__user", "tutor__user").get(pk=lesson.pk)
 
 
-@transaction.atomic
+MAX_CODE_ATTEMPTS = 5
+
+
+def _verify_code(lesson_pk, which, code):
+    """Check a lesson code. Wrong attempts are counted in their own committed update, so a later rollback can't erase them."""
+    lesson = Lesson.objects.get(pk=lesson_pk)
+    if lesson.code_attempts >= MAX_CODE_ATTEMPTS:
+        raise ValidationError("Too many wrong codes. Contact support to unlock this lesson.")
+    if not lesson.check_code(which, code):
+        Lesson.objects.filter(pk=lesson_pk).update(code_attempts=F("code_attempts") + 1)
+        left = MAX_CODE_ATTEMPTS - lesson.code_attempts - 1
+        who = "today's check-in code" if which == "in" else "the check-out code"
+        hint = f" {left} attempt{'s' if left != 1 else ''} left." if left <= 2 else ""
+        raise ValidationError(f"That code is not correct. Ask the parent for {who}.{hint}")
+
+
 def check_in(lesson, tutor, code, lat=None, lng=None):
+    if lesson.tutor_id != tutor.pk:
+        raise ValidationError("This lesson is not yours to check in.")
+    _verify_code(lesson.pk, "in", code)
+    return _check_in(lesson, tutor, lat, lng)
+
+
+@transaction.atomic
+def _check_in(lesson, tutor, lat, lng):
     lesson = _lock_lesson(lesson)
     if lesson.tutor_id != tutor.pk or lesson.booking.status != BookingStatus.ACTIVE:
         raise ValidationError("This lesson is not yours to check in.")
@@ -323,12 +347,6 @@ def check_in(lesson, tutor, code, lat=None, lng=None):
     now = timezone.now()
     if now < lesson.scheduled_start - timedelta(minutes=30):
         raise ValidationError("You can check in from 30 minutes before the lesson starts.")
-    if lesson.code_attempts >= 5:
-        raise ValidationError("Too many wrong codes. Contact support.")
-    if not lesson.check_code("in", code):
-        lesson.code_attempts += 1
-        lesson.save(update_fields=["code_attempts"])
-        raise ValidationError("That code is not correct. Ask the parent for today's check-in code.")
     lesson.status, lesson.checkin_at = LessonStatus.IN_PROGRESS, now
     lesson.late_minutes = max(0, int((now - lesson.scheduled_start).total_seconds() // 60))
     if lat is not None and lng is not None and tutor.location_consent:
@@ -339,21 +357,20 @@ def check_in(lesson, tutor, code, lat=None, lng=None):
     return lesson
 
 
-@transaction.atomic
 def check_out(lesson, tutor, code, topics, homework="", observations=""):
-    lesson = _lock_lesson(lesson)
     if lesson.tutor_id != tutor.pk:
         raise ValidationError("This lesson is not yours.")
-    if lesson.status != LessonStatus.IN_PROGRESS:
-        raise ValidationError("Check in before checking out.")
     if not (topics or "").strip():
         raise ValidationError({"topics": "A lesson note is required: what did you cover?"})
-    if lesson.code_attempts >= 5:
-        raise ValidationError("Too many wrong codes. Contact support.")
-    if not lesson.check_code("out", code):
-        lesson.code_attempts += 1
-        lesson.save(update_fields=["code_attempts"])
-        raise ValidationError("That code is not correct. Ask the parent for the check-out code.")
+    _verify_code(lesson.pk, "out", code)
+    return _check_out(lesson, tutor, topics, homework, observations)
+
+
+@transaction.atomic
+def _check_out(lesson, tutor, topics, homework, observations):
+    lesson = _lock_lesson(lesson)
+    if lesson.status != LessonStatus.IN_PROGRESS:
+        raise ValidationError("Check in before checking out.")
     now = timezone.now()
     lesson.status, lesson.checkout_at = LessonStatus.COMPLETED, now
     lesson.note_topics, lesson.note_homework, lesson.note_observations = topics.strip(), homework.strip(), observations.strip()

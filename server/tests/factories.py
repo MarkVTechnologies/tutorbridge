@@ -76,3 +76,43 @@ def next_weekday(wd, days_ahead=2):
     while d.weekday() != wd:
         d += timedelta(days=1)
     return d
+
+
+def fund_wallet(parent, kobo, ref=None):
+    from payments import ledger
+    from payments.models import AccountKind
+
+    ledger.transfer(ref or f"seed:{parent.pk}:{next(_seq)}", "payment", "seed", ledger.platform(AccountKind.GATEWAY_CLEARING), ledger.wallet(parent), kobo)
+
+
+def make_active_booking(parent, child, tutor, package_size=4, weekday=3, start="17:00", accept=True):
+    """A paid (from wallet) booking, accepted by the tutor unless accept=False."""
+    from bookings import services
+    from core.models import Subject
+
+    fund_wallet(parent, tutor.hourly_rate_kobo * package_size * 3)
+    booking = services.create_booking(
+        parent=parent, tutor=tutor, child=child, subjects=[Subject.objects.get(slug="mathematics")], package_size=package_size,
+        lesson_minutes=60, schedule=[{"weekday": weekday, "start": start}], start_date=next_weekday(weekday),
+    )
+    services.pay_from_wallet(booking)
+    if accept:
+        services.tutor_accept(booking, tutor)
+    booking.refresh_from_db()
+    return booking
+
+
+def deliver(lesson, tutor):
+    """Move a lesson to now and run check-in + check-out."""
+    from datetime import timedelta
+
+    from bookings import services
+
+    lesson.scheduled_start = timezone.now() - timedelta(minutes=5)
+    lesson.scheduled_end = lesson.scheduled_start + timedelta(hours=1)
+    lesson.save()
+    services.check_in(lesson, tutor, lesson.checkin_code)
+    lesson.refresh_from_db()
+    services.check_out(lesson, tutor, lesson.checkout_code, "Algebra")
+    lesson.refresh_from_db()
+    return lesson

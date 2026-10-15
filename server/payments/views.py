@@ -18,7 +18,7 @@ from core.money import split_commission
 from core.throttles import OTPThrottle, PaymentThrottle
 from messaging.notify import notify
 from payments import ledger, services
-from payments.gateways import FakeGateway, GatewayError, get_gateway
+from payments.gateways import GATEWAYS, FakeGateway, GatewayError, InvalidPayload, get_gateway
 from payments.models import AccountKind, BankAccount, LedgerEntry, Payment, PayoutItem
 from tutors.services import check
 from vetting.models import CheckStatus, CheckType
@@ -76,13 +76,13 @@ def webhook(request, gateway):
     """Gateway webhooks: raw body + signature check; always 200 on valid-but-ignored events so the gateway stops retrying."""
     if request.method != "POST":
         return HttpResponse(status=405)
-    if gateway == "fake" and not settings.DEBUG:
+    if gateway not in GATEWAYS or (gateway == "fake" and not settings.DEBUG):
         return HttpResponse(status=404)
     try:
         ok = services.handle_webhook(gateway, request.body, request.headers)
-    except GatewayError:
+    except InvalidPayload:
         return HttpResponse(status=400)
-    except Exception:  # noqa: BLE001 - let the gateway retry
+    except Exception:  # noqa: BLE001 - transient failure (e.g. verify call timed out): 5xx so the gateway retries
         return HttpResponse(status=500)
     return HttpResponse(status=200 if ok else 401)
 
