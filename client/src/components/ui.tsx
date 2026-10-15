@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Inbox, Info, Loader2, Star, X, XCircle, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { Title } from "react-head";
 import { Link } from "react-router-dom";
 
 import type { ApiError } from "@/lib/api";
@@ -244,6 +245,7 @@ export function StatusBadge({ status, label }: { status: string; label?: string 
 export function PageHeader({ title, subtitle, actions, back, eyebrow }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; back?: { to: string; label: string }; eyebrow?: ReactNode }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="mb-7">
+      {typeof title === "string" && <Title>{`${title} · TutorBridge`}</Title>}
       {back && (
         <Link to={back.to} className="group mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-500 transition hover:text-brand-700">
           <ChevronLeft className="size-4 transition-transform group-hover:-translate-x-0.5" /> {back.label}

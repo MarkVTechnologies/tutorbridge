@@ -105,40 +105,54 @@ export function UserDetail() {
   );
 }
 
-const SETTING_HELP: Record<string, string> = {
+const SETTING_LABELS: Record<string, string> = {
   commission_pct_standard: "Default commission (%)",
   commission_pct_by_tier: "Commission by tutor tier (%)",
-  matching_fee_kobo: "Matching fee (kobo)",
-  vetting_fee_kobo: "Tutor vetting fee (kobo)",
+  matching_fee_kobo: "Matching fee (₦)",
+  vetting_fee_kobo: "Tutor vetting fee (₦)",
+  vetting_fee_deduct_from_earnings: "Deduct vetting fee from first earnings",
+  pass_gateway_fee_to_parent: "Pass gateway fees to parents",
   booking_accept_hours: "Hours a tutor has to accept a booking",
   dispute_window_hours: "Dispute window after a lesson (hours)",
   late_cancel_notice_hours: "Late cancellation threshold (hours)",
   late_cancel_tutor_pct: "Late cancellation share paid to tutor (%)",
-  payout_min_kobo: "Minimum payout (kobo)",
+  payout_min_kobo: "Minimum payout (₦)",
   match_weights: "Matching weights",
-  active_gateway: "Active payment gateway (paystack / flutterwave)",
+  active_gateway: "Active payment gateway",
 };
+
+/** Money settings are stored in kobo but edited in naira; booleans as switches; nested values as JSON. */
+function toDraft(k: string, v: unknown) {
+  return k.endsWith("_kobo") ? String((v as number) / 100) : typeof v === "object" ? JSON.stringify(v) : String(v);
+}
+function fromDraft(k: string, v: string, original: unknown) {
+  if (k.endsWith("_kobo")) return toKobo(v);
+  if (typeof original === "boolean") return v === "true";
+  if (typeof original === "number") return Number(v);
+  if (typeof original === "object") return JSON.parse(v);
+  return v;
+}
 
 export function Settings() {
   const { me } = useAuth();
   const { data, isLoading } = useApi<Record<string, unknown>>("/staff/settings/", ["settings"]);
   const { data: ref } = useRefData();
   const [draft, setDraft] = useState<Record<string, string>>({});
-  useEffect(() => { if (data) setDraft(Object.fromEntries(Object.entries(data).map(([k, v]) => [k, JSON.stringify(v)]))); }, [data]);
+  useEffect(() => { if (data) setDraft(Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toDraft(k, v)]))); }, [data]);
   const canEdit = hasPerm(me, "settings.manage");
   const [parseErr, setParseErr] = useState<string | null>(null);
-  const save = useAction((body: Record<string, unknown>) => api.put("/staff/settings/", body), [["settings"], ["ref"]]);
-  const band = useAction((a: { id: number; min: string; max: string }) => api.patch(`/staff/levels/${a.id}/`, { min_rate_kobo: toKobo(a.min), max_rate_kobo: toKobo(a.max) }), [["ref"]]);
-  const addSubject = useAction((name: string) => api.post("/staff/subjects/", { name }), [["ref"]]);
+  const save = useAction((body: Record<string, unknown>) => api.put("/staff/settings/", body), [["settings"], ["ref"]], { success: "Settings saved" });
+  const band = useAction((a: { id: number; min: string; max: string }) => api.patch(`/staff/levels/${a.id}/`, { min_rate_kobo: toKobo(a.min), max_rate_kobo: toKobo(a.max) }), [["ref"]], { success: "Rate band saved" });
+  const addSubject = useAction((name: string) => api.post("/staff/subjects/", { name }), [["ref"]], { success: "Subject added" });
   const [subject, setSubject] = useState("");
   if (isLoading || !data) return <Loading />;
-  const changed = Object.entries(draft).filter(([k, v]) => v !== JSON.stringify(data[k]));
+  const changed = Object.entries(draft).filter(([k, v]) => v !== toDraft(k, data[k]));
   const submit = () => {
     try {
       setParseErr(null);
-      save.mutate(Object.fromEntries(changed.map(([k, v]) => [k, JSON.parse(v)])));
+      save.mutate(Object.fromEntries(changed.map(([k, v]) => [k, fromDraft(k, v, data[k])])));
     } catch {
-      setParseErr("One of the values isn't valid JSON (numbers as 20, text in \"quotes\", objects in {}).");
+      setParseErr("One of the advanced values isn't valid JSON.");
     }
   };
   return (
@@ -146,12 +160,19 @@ export function Settings() {
       <PageHeader title="Configuration" subtitle="Fees, policies and matching. Every change is audit-logged." actions={canEdit && <Button disabled={!changed.length} loading={save.isPending} onClick={submit}>Save {changed.length || ""} change(s)</Button>} />
       {parseErr && <Alert>{parseErr}</Alert>}
       <ErrorAlert error={save.error} />
-      {save.isSuccess && <Alert tone="green">Saved.</Alert>}
       <Card title="Business rules">
         <div className="grid gap-4 md:grid-cols-2">
-          {Object.keys(data).map((k) => (
-            <Input key={k} label={SETTING_HELP[k] ?? k.replace(/_/g, " ")} hint={k} disabled={!canEdit} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
-          ))}
+          {Object.keys(data).map((k) => {
+            const label = SETTING_LABELS[k] ?? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+            if (typeof data[k] === "boolean") {
+              return <Select key={k} label={label} disabled={!canEdit} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}><option value="true">Yes</option><option value="false">No</option></Select>;
+            }
+            if (k === "active_gateway") {
+              return <Select key={k} label={label} disabled={!canEdit} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}><option value="paystack">Paystack</option><option value="flutterwave">Flutterwave</option></Select>;
+            }
+            const advanced = typeof data[k] === "object";
+            return <Input key={k} label={label} hint={advanced ? "Advanced: JSON" : undefined} inputMode={advanced ? undefined : "decimal"} disabled={!canEdit} value={draft[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />;
+          })}
         </div>
       </Card>
       <Card title="Rate bands per level (₦/hour)">
@@ -166,7 +187,7 @@ export function Settings() {
             <div className="w-64"><Input label="New subject" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
             <Button loading={addSubject.isPending}>Add</Button>
           </form>
-          <p className="mt-3 text-sm text-slate-600">{ref?.subjects.map((s) => s.name).join(" · ")}</p>
+          <p className="mt-3 text-sm text-ink-600">{ref?.subjects.map((s) => s.name).join(" · ")}</p>
         </Card>
       )}
     </div>
