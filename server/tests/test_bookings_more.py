@@ -388,3 +388,67 @@ class BookingApiTests(TestCase):
         self.assertEqual(c.post(f"/api/staff/bookings/{b.pk}/cancel/", {"reason": "Family moved"}, format="json").status_code, 200)
         self.assertEqual(ledger.balance(ledger.escrow(b)), 0)
         self.assertEqual(c.post(f"/api/staff/bookings/{b.pk}/explode/").status_code, 400)
+
+
+@override_settings(DEBUG=True, PAYMENT_GATEWAY="fake")
+class DateFilterTests(TestCase):
+    """Regression: date filters must not depend on the database's time-zone tables (MySQL CONVERT_TZ returns NULL without them)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        seed()
+
+    def test_lesson_date_range_filter(self):
+        parent, child = make_parent()
+        tutor = make_tutor()
+        b = make_active_booking(parent, child, tutor, package_size=4)
+        lessons = list(b.lessons.order_by("scheduled_start"))
+        c = APIClient()
+        c.force_login(parent.user)
+        first = timezone.localtime(lessons[0].scheduled_start).date()
+        r = c.get(f"/api/lessons/?from={first}&to={first}").json()
+        self.assertEqual([x["id"] for x in r["results"]], [lessons[0].pk])
+        r = c.get(f"/api/lessons/?from={first}").json()
+        self.assertEqual(len(r["results"]), 4)
+        self.assertEqual(c.get("/api/lessons/?from=yesterday").status_code, 400)
+
+    def test_lesson_near_midnight_counts_on_lagos_day(self):
+        """23:30 Lagos is 22:30 UTC on the same day; 00:30 Lagos is 23:30 UTC on the previous UTC day."""
+        from core.dates import day_range
+
+        parent, child = make_parent()
+        tutor = make_tutor()
+        b = make_active_booking(parent, child, tutor, package_size=1)
+        lesson = b.lessons.get()
+        day = timezone.localdate() + timedelta(days=5)
+        lo, hi = day_range(day, day)
+        lesson.scheduled_start = lo + timedelta(minutes=30)  # 00:30 Lagos
+        lesson.save()
+        self.assertTrue(b.lessons.filter(scheduled_start__gte=lo, scheduled_start__lt=hi).exists())
+        self.assertFalse(b.lessons.filter(scheduled_start__gte=lo + timedelta(days=1), scheduled_start__lt=hi + timedelta(days=1)).exists())
+
+    def test_export_from_filter(self):
+        admin = make_staff(Role.SUPER)
+        make_parent()
+        s = staff_client(APIClient(), admin)
+        today = timezone.localdate()
+        rows = s.get(f"/api/staff/exports/payments/?from={today}").content.decode().strip().splitlines()
+        self.assertEqual(len(rows), 1)  # header only, no crash
+        self.assertEqual(s.get("/api/staff/exports/users/?from=nope").status_code, 400)
+
+    def test_statement_includes_this_months_lessons(self):
+        from unittest import mock
+
+        parent, child = make_parent()
+        tutor = make_tutor()
+        b = make_active_booking(parent, child, tutor, package_size=1)
+        services.confirm_lesson(deliver(b.lessons.get(), tutor))
+        from core import pdf
+
+        captured = []
+        real_table = pdf._table
+        with mock.patch.object(pdf, "_table", side_effect=lambda rows, *a, **k: captured.append(rows) or real_table(rows, *a, **k)):
+            pdf.statement_pdf(tutor, timezone.localdate().year, timezone.localdate().month)
+        lesson_rows = captured[0]
+        self.assertEqual(len(lesson_rows), 3)  # header + 1 lesson + total
+

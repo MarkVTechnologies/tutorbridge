@@ -44,10 +44,21 @@ and sends a signed webhook to the server — the same path real Paystack payment
 ### Tests
 
 ```bash
-cd server && python manage.py test tests           # ledger, payments, bookings, policies, permissions
-python -m coverage run manage.py test tests && python -m coverage report
+cd server && python manage.py test tests           # 151 tests: ledger, payments, bookings, policies, permissions
+python -m coverage run manage.py test tests && python -m coverage report   # ~92% on payments/bookings/accounts/trust
 cd client && npm run typecheck
 ```
+
+The suite passes on both SQLite and MariaDB 10.11 (strict mode, utf8mb4). To run it against MySQL/MariaDB,
+point the `DB_*` variables at a server where the app user may create `test_<DB_NAME>`:
+
+```bash
+DB_ENGINE=mysql DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=tutorbridge DB_USER=tutorbridge DB_PASSWORD=... python manage.py test tests
+```
+
+**Dates and time zones.** The app does not need MySQL's time-zone tables (often missing on cPanel).
+Never use Django's `__date` / `Trunc*` lookups — they call `CONVERT_TZ()`, which returns NULL without those
+tables and silently matches nothing. Use `core.dates.day_start()` / `day_range()` to filter by Lagos days.
 
 ## What's built (PRD Must requirements)
 
@@ -76,12 +87,14 @@ cd client && npm run typecheck
 
 1. **Build the client locally**: `cd client && npm ci && npm run build` → `client/dist/` (commit it on the release branch or upload it).
 2. **cPanel → Setup Python App**: Python 3.12, app root outside `public_html` (e.g. `~/tutorbridge/server`), startup file `passenger_wsgi.py`, entry point `application`.
-3. **Environment variables** (Python app screen): everything in `server/.env.example` with production values — `DJANGO_DEBUG=0`, a long `DJANGO_SECRET_KEY`, `DB_ENGINE=mysql` + credentials, `FIELD_ENCRYPTION_KEYS`, `PAYMENT_GATEWAY=paystack`, gateway keys, `SMS_PROVIDER=termii`, SMTP, `SITE_URL=https://yourdomain`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `PRIVATE_MEDIA_ROOT` (outside `public_html`), `CLIENT_DIST_DIR`.
-4. **Over SSH**: activate the virtualenv, `pip install -r requirements.txt`, back up the DB, then
+3. **Database**: in cPanel → MySQL Databases create the database (utf8mb4) and a user with privileges on that
+   database only. Time-zone tables are not required.
+4. **Environment variables** (Python app screen): everything in `server/.env.example` with production values — `DJANGO_DEBUG=0`, a long `DJANGO_SECRET_KEY`, `DB_ENGINE=mysql` + credentials, `FIELD_ENCRYPTION_KEYS`, `PAYMENT_GATEWAY=paystack`, gateway keys, `SMS_PROVIDER=termii`, SMTP, `SITE_URL=https://yourdomain`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `PRIVATE_MEDIA_ROOT` (outside `public_html`), `CLIENT_DIST_DIR`.
+5. **Over SSH**: activate the virtualenv, `pip install -r requirements.txt`, back up the DB, then
    `python manage.py migrate && python manage.py createcachetable && python manage.py seed_reference && python manage.py collectstatic --noinput`, then `touch tmp/restart.txt`.
-5. **First admin**: `python manage.py shell -c "from accounts.models import User; User.objects.create_superuser('you@domain', '+234…', 'strong-password', first_name='…', last_name='…')"` — sign in and set up 2FA.
-6. **Webhooks**: Paystack → `https://yourdomain/api/payments/webhooks/paystack/`; Flutterwave → `/api/payments/webhooks/flutterwave/` (set the secret hash).
-7. **Cron jobs** (cPanel → Cron Jobs; use the virtualenv's python):
+6. **First admin**: `python manage.py shell -c "from accounts.models import User; User.objects.create_superuser('you@domain', '+234…', 'strong-password', first_name='…', last_name='…')"` — sign in and set up 2FA.
+7. **Webhooks**: Paystack → `https://yourdomain/api/payments/webhooks/paystack/`; Flutterwave → `/api/payments/webhooks/flutterwave/` (set the secret hash).
+8. **Cron jobs** (cPanel → Cron Jobs; use the virtualenv's python):
    ```
    * * * * *    cd ~/tutorbridge/server && ~/virtualenv/tutorbridge/server/3.12/bin/python manage.py cron minute
    */5 * * * *  … manage.py cron five      # offers, reminders, late/no-show, SLA
@@ -90,4 +103,4 @@ cd client && npm run typecheck
    0 18 * * 4   … manage.py cron weekly    # prepare payout batch for Friday approval
    0 3 1 * *    … manage.py cron monthly   # re-verification and review reminders
    ```
-8. **Monitoring**: point UptimeRobot at `/api/health/` — it returns 503 if the job queue hasn't run in 10 minutes.
+9. **Monitoring**: point UptimeRobot at `/api/health/` — it returns 503 if the job queue hasn't run in 10 minutes.

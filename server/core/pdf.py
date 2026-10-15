@@ -10,6 +10,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from core.dates import day_range
+
 BRAND = colors.HexColor("#0f5132")
 
 
@@ -79,9 +81,10 @@ def statement_pdf(tutor, year, month):
 
     start = date(year, month, 1)
     end = date(year, month, calendar.monthrange(year, month)[1])
+    lo, hi = day_range(start, end)
 
     def story(styles):
-        lessons = Lesson.objects.filter(tutor=tutor, confirmed_at__date__gte=start, confirmed_at__date__lte=end, status=LessonStatus.CONFIRMED).select_related("booking__child")
+        lessons = Lesson.objects.filter(tutor=tutor, confirmed_at__gte=lo, confirmed_at__lt=hi, status=LessonStatus.CONFIRMED).select_related("booking__child")
         rows = [["Date", "Student", "Hours", "Lesson value", "Commission", "Your earnings"]]
         tot_gross = tot_net = 0
         for l in lessons:
@@ -90,7 +93,7 @@ def statement_pdf(tutor, year, month):
             tot_net += net
             rows.append([f"{timezone.localtime(l.scheduled_start):%d %b}", l.booking.child.first_name, f"{l.duration_hours:.1f}", _ngn(l.amount_kobo), _ngn(comm), _ngn(net)])
         rows.append(["Total", "", "", _ngn(tot_gross), _ngn(tot_gross - tot_net), _ngn(tot_net)])
-        payouts = PayoutItem.objects.filter(tutor=tutor, status=PayoutItem.Status.SUCCESS, updated_at__date__gte=start, updated_at__date__lte=end)
+        payouts = PayoutItem.objects.filter(tutor=tutor, status=PayoutItem.Status.SUCCESS, updated_at__gte=lo, updated_at__lt=hi)
         prow = [["Payout date", "Bank", "Amount"]] + [[f"{timezone.localtime(p.updated_at):%d %b %Y}", f"{p.bank_snapshot.get('bank_name')} ****{p.bank_snapshot.get('last4')}", _ngn(p.amount_kobo)] for p in payouts]
         return [
             Paragraph(f"{tutor.user.get_full_name()} — {start:%B %Y}", styles["Normal"]), Spacer(1, 4 * mm),
@@ -105,9 +108,10 @@ def progress_report_pdf(booking, year, month):
 
     start = date(year, month, 1)
     end = date(year, month, calendar.monthrange(year, month)[1])
+    lo, hi = day_range(start, end)
 
     def story(styles):
-        lessons = booking.lessons.filter(scheduled_start__date__gte=start, scheduled_start__date__lte=end).order_by("scheduled_start")
+        lessons = booking.lessons.filter(scheduled_start__gte=lo, scheduled_start__lt=hi).order_by("scheduled_start")
         attended = [l for l in lessons if l.checkin_at]
         on_time = [l for l in attended if l.late_minutes <= 10]
         summary = [

@@ -13,7 +13,12 @@ from accounts.models import Role
 from accounts.permissions import IsParent, IsVerifiedUser
 from bookings import services
 from bookings.models import Booking, BookingStatus, Lesson, LessonStatus
-from bookings.serializers import BookingSerializer, CreateBookingSerializer, LessonSerializer
+from bookings.serializers import (
+    BookingSerializer,
+    CreateBookingSerializer,
+    LessonSerializer,
+)
+from core.dates import day_start, parse_date
 from core.models import Area, Subject
 from core.throttles import PaymentThrottle
 from matching.models import LessonRequest, Match, MatchStatus
@@ -39,6 +44,13 @@ def quote(request):
                        lesson_minutes=int(request.data.get("lesson_minutes", 60)), request=req)
     q.pop("commission_pct")  # internal
     return Response(q)
+
+
+def _date_param(value):
+    d = parse_date(value)
+    if d is None:
+        raise ValidationError("Dates must be YYYY-MM-DD.")
+    return d
 
 
 class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -164,9 +176,9 @@ class LessonViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         if p.get("upcoming") == "1":
             qs = qs.filter(status__in=[LessonStatus.SCHEDULED, LessonStatus.IN_PROGRESS], scheduled_end__gte=timezone.now() - timedelta(hours=6))
         if p.get("from"):
-            qs = qs.filter(scheduled_start__date__gte=p["from"])
+            qs = qs.filter(scheduled_start__gte=day_start(_date_param(p["from"])))
         if p.get("to"):
-            qs = qs.filter(scheduled_start__date__lte=p["to"])
+            qs = qs.filter(scheduled_start__lt=day_start(_date_param(p["to"]) + timedelta(days=1)))
         return qs.select_related("booking__parent__user", "tutor__user", "booking__child").order_by("scheduled_start")
 
     def _tutor_only(self):

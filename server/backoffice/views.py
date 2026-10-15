@@ -23,6 +23,7 @@ from bookings.models import Booking, BookingStatus, Lesson, LessonStatus
 from bookings.serializers import LessonSerializer
 from core import config
 from core.audit import audit
+from core.dates import day_start, parse_date
 from core.models import AuditLog, Level, Subject
 from matching.engine import run_matching
 from matching.models import LessonRequest, Match, MatchStatus, RequestStatus
@@ -32,14 +33,30 @@ from messaging.notify import notify
 from parents.models import ParentProfile
 from payments import ledger
 from payments import services as pay
-from payments.models import AccountKind, LedgerAccount, LedgerEntry, Payment, Payout, PayoutItem, ReconciliationRun
+from payments.models import (
+    AccountKind,
+    LedgerAccount,
+    LedgerEntry,
+    Payment,
+    Payout,
+    PayoutItem,
+    ReconciliationRun,
+)
 from trust import services as trust
 from trust.models import Dispute, DisputeStatus, Incident, Review
 from tutors import services as tutor_services
 from tutors.models import TutorProfile, TutorStatus
 from tutors.serializers import TutorOwnProfileSerializer
 from vetting import services as vetting_services
-from vetting.models import CheckStatus, CheckType, Document, InterviewSlot, Question, Reference, TestAttempt
+from vetting.models import (
+    CheckStatus,
+    CheckType,
+    Document,
+    InterviewSlot,
+    Question,
+    Reference,
+    TestAttempt,
+)
 
 
 def _paginate(request, qs, fn):
@@ -895,7 +912,10 @@ def export_csv(request, name):
     w.writerow(headers)
     qs = qs_fn()
     if request.query_params.get("from"):
-        qs = qs.filter(created_at__date__gte=request.query_params["from"]) if hasattr(qs.model, "created_at") else qs
+        since = parse_date(request.query_params["from"])
+        if since is None:
+            raise ValidationError({"from": "Use YYYY-MM-DD."})
+        qs = qs.filter(created_at__gte=day_start(since)) if hasattr(qs.model, "created_at") else qs
     for obj in qs.iterator():
         w.writerow(["'" + str(v) if isinstance(v, str) and v[:1] in "=+-@" else v for v in row_fn(obj)])  # CSV-injection guard
     audit(request.user, "export", "export", name, request=request)

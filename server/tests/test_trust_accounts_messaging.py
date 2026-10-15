@@ -17,7 +17,7 @@ from matching.models import LessonRequest, Match, MatchStatus, RequestStatus
 from messaging.models import Message, Notification
 from tests.factories import PASSWORD, deliver, make_active_booking, make_parent, make_staff, make_tutor, next_weekday, seed, staff_client
 from trust import services as trust
-from trust.models import Incident, Review
+from trust.models import Incident
 from tutors.models import TutorStatus
 from vetting.models import CheckStatus, CheckType, VerificationCheck
 
