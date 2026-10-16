@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DateChip, greeting, LessonRow, QuickAction, WelcomeBanner } from "@/components/app";
 import { CalendarButton } from "@/components/CalendarButton";
+import { JoinLessonButton, OnlineLinkCard } from "@/components/OnlineLesson";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import {
@@ -255,6 +256,7 @@ export function TutorBookingDetail() {
                     <div className="flex-1"><p className="font-semibold text-ink-900">{timeOnly(l.scheduled_start)} – {timeOnly(l.scheduled_end)}</p>{l.note_topics && <p className="truncate text-sm text-ink-500">{l.note_topics}</p>}</div>
                     <StatusBadge status={l.status} label={l.status_display} />
                   </Link>
+                  <JoinLessonButton lesson={{ ...l, online_link: b.online_link }} className="mt-3 w-full" />
                   <LessonActions lesson={l} invalidate={[key]} />
                 </li>
               ))}
@@ -272,6 +274,7 @@ export function TutorBookingDetail() {
               })}
             </dl>
           </Card>
+          <OnlineLinkCard booking={b} invalidate={[key]} />
           {b.parent_summary && (
             <Card title="Family record" subtitle="Shared so you can teach with confidence">
               <div className="grid grid-cols-2 gap-3 text-center">
@@ -370,10 +373,11 @@ export function LessonPage() {
         </div>
       </div>
 
+      <JoinLessonButton lesson={l} className="mt-4 w-full" />
       {l.status === "scheduled" && (
         <Card className="mt-4">
-          <p className="font-display text-lg font-bold">Arrived? Check in.</p>
-          <p className="mt-1 text-sm text-ink-500">Ask the parent for today's 6-digit check-in code.</p>
+          <p className="font-display text-lg font-bold">{l.is_online ? "Lesson starting? Check in." : "Arrived? Check in."}</p>
+          <p className="mt-1 text-sm text-ink-500">Ask the parent for today's 6-digit check-in code{l.is_online ? " at the start of the call" : ""}.</p>
           <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); doCheckIn(); }}>
             <ErrorAlert error={checkIn.error} />
             <CodeInput value={code} onChange={setCode} label="Check-in code" />

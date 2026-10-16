@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { CodeDisplay, DateChip, greeting, LessonRow, QuickAction, StatusStepper, WelcomeBanner } from "@/components/app";
 import { AddressSearch } from "@/components/AddressSearch";
 import { CalendarButton } from "@/components/CalendarButton";
+import { JoinLessonButton } from "@/components/OnlineLesson";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import { KeyValue, ScheduleEditor, TutorCard } from "@/components/shared";
@@ -519,6 +520,9 @@ export function ParentBookingDetail() {
             <ErrorAlert error={payNow.error} />
           </Alert>
         )}
+        {b.is_online && b.status === "active" && (b.online_link
+          ? <Alert tone="blue" title="Online lessons">{b.tutor_name} will meet {b.child_name} at <a className="font-semibold break-all underline" href={b.online_link} target="_blank" rel="noopener noreferrer">{b.online_link}</a>. A Join button appears on each lesson 15 minutes before it starts. Share the check-in code with the tutor at the start of the call.</Alert>
+          : <Alert tone="amber" title="Online lessons">{b.tutor_name} hasn't added the video link yet — we'll notify you as soon as they do.</Alert>)}
         {b.renews && <Alert tone="blue">This package continues <Link className="font-semibold underline" to={`/parent/bookings/${b.renews}`}>your previous package</Link> with {b.tutor_name}.</Alert>}
         {b.renewed_by && <Alert tone="green">This package has been renewed. <Link className="font-semibold underline" to={`/parent/bookings/${b.renewed_by}`}>See the next package →</Link></Alert>}
       </div>
@@ -537,6 +541,7 @@ export function ParentBookingDetail() {
                   </div>
                   <StatusBadge status={l.status} label={l.status_display} />
                 </div>
+                <JoinLessonButton lesson={{ ...l, online_link: b.online_link }} className="mt-4 w-full" />
                 {l.codes && (
                   <div className="mt-4 flex flex-wrap gap-6 rounded-2xl bg-white p-4 ring-1 ring-brand-100">
                     {l.codes.checkin && <CodeDisplay label="Check-in code" code={l.codes.checkin} />}

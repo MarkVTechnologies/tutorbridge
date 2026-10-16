@@ -113,6 +113,8 @@ export interface Lesson {
   booking: number;
   tutor_name: string;
   child_name: string;
+  is_online: boolean;
+  online_link: string;
   scheduled_start: string;
   scheduled_end: string;
   status: string;

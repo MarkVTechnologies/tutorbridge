@@ -13,6 +13,8 @@ class LessonSerializer(serializers.ModelSerializer):
     dispute_status = serializers.SerializerMethodField()
     tutor_name = serializers.CharField(source="tutor.user.display_name", read_only=True)
     child_name = serializers.CharField(source="booking.child.first_name", read_only=True)
+    is_online = serializers.BooleanField(source="booking.is_online", read_only=True)
+    online_link = serializers.CharField(source="booking.online_link", read_only=True)
 
     class Meta:
         model = Lesson
@@ -20,6 +22,7 @@ class LessonSerializer(serializers.ModelSerializer):
             "id", "booking", "tutor_name", "child_name", "scheduled_start", "scheduled_end", "status", "status_display",
             "amount_kobo", "escrow_status", "checkin_at", "checkout_at", "late_minutes", "note_topics", "note_homework",
             "note_observations", "confirmed_at", "cancelled_by", "cancel_reason", "codes", "can_dispute", "dispute_status",
+            "is_online", "online_link",
         ]
 
     def get_codes(self, obj):

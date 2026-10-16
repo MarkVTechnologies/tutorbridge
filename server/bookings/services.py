@@ -634,6 +634,40 @@ def _alert_ops(title, detail):
         notify(u, "finance_alert", {"title": title, "detail": detail}, force_channels=("inapp",))
 
 
+# --- Online lessons (LSN-07) -------------------------------------------------
+
+# Only well-known video services, so a tutor can't send families to an arbitrary (possibly malicious) site.
+ONLINE_LESSON_HOSTS = ("meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com", "whereby.com")
+
+
+def validate_online_link(url):
+    from urllib.parse import urlparse
+
+    url = (url or "").strip()
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not any(host == h or host.endswith("." + h) for h in ONLINE_LESSON_HOSTS):
+        raise ValidationError({"online_link": "Use a Google Meet, Zoom, Microsoft Teams or Whereby link starting with https://"})
+    return url
+
+
+def set_online_link(booking, tutor, url):
+    if booking.tutor_id != tutor.pk:
+        raise ValidationError("Not your booking.")
+    if not booking.is_online:
+        raise ValidationError("This is an in-person booking.")
+    if booking.status not in (BookingStatus.ACTIVE, BookingStatus.OFFERED):
+        raise ValidationError("This booking is closed.")
+    url = validate_online_link(url)
+    changed = url != booking.online_link
+    booking.online_link = url
+    booking.save(update_fields=["online_link"])
+    if changed:
+        notify(booking.parent.user, "online_link_set", {"tutor_name": tutor.user.display_name, "child_name": booking.child.first_name, "link": url},
+               link=f"/parent/bookings/{booking.pk}")
+    return booking
+
+
 # --- Package auto-renewal (BKG-06) ------------------------------------------
 
 
@@ -671,6 +705,9 @@ def renew_package(booking):
             package_size=booking.package_size, lesson_minutes=booking.lesson_minutes, schedule=booking.schedule, start_date=start,
             address=booking.address, area=booking.area, is_online=booking.is_online, lat=booking.lat, lng=booking.lng,
         )
+        if booking.online_link:
+            new.online_link = booking.online_link  # same tutor, same meeting room
+            new.save(update_fields=["online_link"])
     except ValidationError as e:
         booking.auto_renew = False
         booking.save(update_fields=["auto_renew"])

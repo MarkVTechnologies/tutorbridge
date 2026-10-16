@@ -160,6 +160,14 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         return Response({"booking": self.get_serializer(booking).data,
                          "payment": {"reference": payment.reference, "amount_kobo": due, "authorization_url": payment.authorization_url}})
 
+    @action(detail=True, methods=["patch"], url_path="online-link")
+    def online_link(self, request, pk=None):
+        """LSN-07: the tutor sets the video link for an online booking."""
+        if request.user.role != Role.TUTOR:
+            raise ValidationError("Only the tutor can set the lesson link.")
+        booking = services.set_online_link(self.get_object(), request.user.tutor_profile, request.data.get("online_link", ""))
+        return Response(self.get_serializer(booking).data)
+
     @action(detail=True, methods=["patch"], url_path="auto-renew", permission_classes=[IsParent])
     def auto_renew(self, request, pk=None):
         booking = self.get_object()
