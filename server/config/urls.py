@@ -94,6 +94,9 @@ api = [
     path("vetting/safeguarding/", vetting.safeguarding),
     # Bookings
     path("bookings-quote/", bookings.quote),
+    path("calendar/", bookings.calendar_info),
+    path("calendar/reset/", bookings.calendar_reset),
+    path("calendar/<str:token>.ics", bookings.calendar_feed),
     # Payments
     path("payments/", payments.payments_list),
     path("payments/topup/", payments.topup),

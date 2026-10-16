@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DateChip, greeting, LessonRow, QuickAction, WelcomeBanner } from "@/components/app";
+import { CalendarButton } from "@/components/CalendarButton";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import {
@@ -298,7 +299,7 @@ export function TutorLessons() {
   return (
     <div className="max-w-5xl">
       <Seo title="Lessons" />
-      <PageHeader eyebrow="Teaching" title="Lessons" actions={<Tabs value={view} onChange={setView} options={[{ value: "upcoming", label: "Upcoming" }, { value: "all", label: "History" }]} />} />
+      <PageHeader eyebrow="Teaching" title="Lessons" actions={<><CalendarButton /><Tabs value={view} onChange={setView} options={[{ value: "upcoming", label: "Upcoming" }, { value: "all", label: "History" }]} /></>} />
       {view === "all" && <div className="mb-4 w-48"><Input label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>}
       {isLoading && <Loading />}
       {data?.results.length === 0 && <EmptyState icon={CalendarDays} title="No lessons here" />}

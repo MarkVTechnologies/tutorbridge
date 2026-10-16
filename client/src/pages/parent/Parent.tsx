@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { CodeDisplay, DateChip, greeting, LessonRow, QuickAction, StatusStepper, WelcomeBanner } from "@/components/app";
+import { CalendarButton } from "@/components/CalendarButton";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import { KeyValue, ScheduleEditor, TutorCard } from "@/components/shared";
@@ -440,7 +441,7 @@ export function ParentBookings() {
   return (
     <div className="max-w-5xl">
       <Seo title="Bookings" />
-      <PageHeader eyebrow="Lessons" title="Bookings" />
+      <PageHeader eyebrow="Lessons" title="Bookings" actions={<CalendarButton />} />
       {isLoading && <Loading />}
       {data?.results.length === 0 && <EmptyState icon={CalendarDays} title="No bookings yet" action={<ButtonLink to="/parent/requests" icon={Search}>View your shortlists</ButtonLink>}>Book a tutor from a shortlist and your lessons will show up here.</EmptyState>}
       <div className="grid gap-4 md:grid-cols-2">

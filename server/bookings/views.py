@@ -258,3 +258,51 @@ class LessonViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
             raise ValidationError({"description": "Describe what is happening."})
         incident = report_incident(request.user, description, request.data.get("severity", "urgent"), lesson=self.get_object())
         return Response({"id": incident.pk, "detail": "Our safety team has been alerted and will contact you right away. If anyone is in immediate danger, call 112."})
+
+
+# --- Calendar feed (BKG-05) ----------------------------------------------------
+
+
+def _calendar_urls(user):
+    from django.conf import settings
+
+    url = f"{settings.SITE_URL}/api/calendar/{user.calendar_token}.ics"
+    return {"url": url, "webcal": url.replace("https://", "webcal://").replace("http://", "webcal://")}
+
+
+@api_view(["GET"])
+def calendar_info(request):
+    from bookings.calendar import ensure_token
+
+    if request.user.role not in (Role.PARENT, Role.TUTOR):
+        raise ValidationError("Calendar feeds are for parents and tutors.")
+    ensure_token(request.user)
+    return Response(_calendar_urls(request.user))
+
+
+@api_view(["POST"])
+def calendar_reset(request):
+    """Issue a new private URL (e.g. if the old one was shared by mistake); the old one stops working."""
+    from bookings.calendar import ensure_token
+
+    if request.user.role not in (Role.PARENT, Role.TUTOR):
+        raise ValidationError("Calendar feeds are for parents and tutors.")
+    ensure_token(request.user, reset=True)
+    return Response(_calendar_urls(request.user))
+
+
+def calendar_feed(request, token):
+    """Public by unguessable token (calendar apps can't log in)."""
+    from django.http import Http404, HttpResponse
+
+    from accounts.models import User
+    from bookings.calendar import build_ics
+
+    user = User.objects.filter(calendar_token=token, is_active=True, suspended_at__isnull=True).first() if token else None
+    if user is None:
+        raise Http404
+    resp = HttpResponse(build_ics(user), content_type="text/calendar; charset=utf-8")
+    resp["Content-Disposition"] = 'inline; filename="tutorbridge.ics"'
+    resp["Cache-Control"] = "private, max-age=900"
+    return resp
+

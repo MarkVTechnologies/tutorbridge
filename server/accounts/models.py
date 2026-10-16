@@ -70,6 +70,7 @@ class User(AbstractBaseUser):
     # PAY-10 referrals
     referral_code = models.CharField(max_length=12, unique=True, null=True, blank=True)
     referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="referrals")
+    calendar_token = models.CharField(max_length=48, unique=True, null=True, blank=True)  # BKG-05 private iCal feed
 
     objects = UserManager()
 
