@@ -1,4 +1,4 @@
-import { AlertTriangle, Banknote, CalendarDays, CheckCircle2, GraduationCap, Search, Send, Siren, TrendingUp, Users } from "lucide-react";
+import { Activity, AlertTriangle, Banknote, CalendarDays, CheckCircle2, GraduationCap, Search, Send, Siren, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -47,7 +47,30 @@ export function StaffDashboard() {
         <Stat label="Payouts due" value={naira(d.payouts_due_kobo)} icon={Send} iconTone="blue" />
         <Stat label="Disputes / incidents" value={`${d.open_disputes} / ${d.open_incidents}`} tone={d.open_incidents ? "red" : undefined} icon={Siren} iconTone="red" />
       </div>
+      {hasPerm(me, "audit.view") && <SystemHealth />}
     </div>
+  );
+}
+
+type HealthCheck = { key: string; label: string; ok: boolean; detail: string };
+
+/** Live operational checks (the same ones emailed to admins every morning). */
+function SystemHealth() {
+  const { data } = useApi<HealthCheck[]>("/staff/health/", ["staff-health"]);
+  if (!data) return null;
+  const problems = data.filter((c) => !c.ok).length;
+  return (
+    <Card className="mt-6" title="System health" icon={Activity}
+      subtitle={problems ? `${problems} item${problems > 1 ? "s" : ""} need attention` : "All checks passing"}>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {[...data].sort((a, b) => Number(a.ok) - Number(b.ok)).map((c) => (
+          <li key={c.key} className={cn("flex gap-3 rounded-2xl p-3 ring-1", c.ok ? "bg-white ring-ink-100" : "bg-red-50/60 ring-red-200")}>
+            {c.ok ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-brand-500" /> : <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-500" />}
+            <div className="min-w-0"><p className="text-sm font-semibold text-ink-900">{c.label}</p><p className="text-xs text-ink-500">{c.detail}</p></div>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

@@ -33,6 +33,7 @@ DEFAULT_TEMPLATES = {
     "renewal_payment_needed": (("email", "sms", "inapp"), "Action needed: renew {child_name}'s lessons", "Hi {first_name},\n\nWe've held {tutor_name}'s slots for {child_name}'s next {lessons} lessons, but couldn't take payment automatically ({reason}). Please pay {amount} within {hours} hours to keep the slots: {link}", "TutorBridge: please pay {amount} within {hours}h to keep {child_name}'s lesson slots. Open the app to pay."),
     "renewal_failed": (("email", "inapp"), "We couldn't renew {child_name}'s package", "Hi {first_name},\n\nWe couldn't renew {child_name}'s package with {tutor_name}: {reason}. Auto-renewal has been turned off. Our team can help you book again.", ""),
     "tutor_package_renewed": (("email", "inapp"), "{child_name}'s package has renewed", "Hi {first_name},\n\nThe family renewed {child_name}'s package: {lessons} more lessons from {first_lesson}, same schedule.", ""),
+    "health_report": (("email",), "TutorBridge daily health: {title}", "{detail}", ""),
     "referral_reward": (("email", "inapp"), "You've earned {amount}", "Hi {first_name},\n\n{detail}", ""),
     "payment_received": (("email", "inapp"), "Payment received — {amount}", "Hi {first_name},\n\nWe received {amount} (ref {reference}). Your receipt is in your dashboard.", ""),
     "lesson_reminder": (("sms", "inapp"), "", "Lesson reminder: {when}", "TutorBridge reminder: lesson {when}. Check-in code: {code}"),

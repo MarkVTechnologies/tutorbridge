@@ -994,3 +994,11 @@ def promo_update(request, pk):
     audit(request.user, "promo.update", "promo", p.pk, after={k: str(v) for k, v in changes.items()}, request=request)
     return Response(_promo_json(p))
 
+
+@api_view(["GET"])
+@permission_classes([staff_perm("audit.view")])
+def system_health(request):
+    from core.health import checks
+
+    return Response(checks())
+

@@ -50,6 +50,9 @@ def daily():
 
     reconcile()
     nightly_reputation()
+    from core.health import send_daily_report
+
+    send_daily_report()
     call_command("clearsessions")
     _expire_background_checks()
     _purge_rejected_documents()

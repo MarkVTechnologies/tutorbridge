@@ -221,6 +221,20 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "TutorBridge <no-reply@tutorbridge.ng>")
 
+# --- Error tracking (optional) ---------------------------------------------
+SENTRY_DSN = env("SENTRY_DSN", "")
+if SENTRY_DSN and not TESTING:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        environment=env("SENTRY_ENVIRONMENT", "production"),
+        traces_sample_rate=float(env("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+        send_default_pii=False,  # no emails, IPs, cookies or request bodies (children's and payment data)
+    )
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
