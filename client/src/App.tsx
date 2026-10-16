@@ -4,13 +4,9 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider, useRouteError } 
 import { AppLayout, PublicLayout } from "@/components/Layout";
 import { Alert, ButtonLink, Loading } from "@/components/ui";
 import { RequireAuth } from "@/lib/auth";
-import { ForgotPassword, Login, ResetPassword, Signup, TwoFactor, VerifyAccount, VerifyEmail } from "@/pages/auth/Auth";
-import { Blog, BlogPost, Contact, Faq, ReferenceForm, SeoLanding } from "@/pages/public/Content";
 import { Home, HowItWorks, Legal, Pricing, Safety, TeachWithUs } from "@/pages/public/Marketing";
-import { FindTutors, TutorProfile } from "@/pages/public/Tutors";
-import { Account, FakeCheckout, Messages, Notifications, PaymentCallback } from "@/pages/shared/Shared";
 
-// Signed-in areas are split into their own chunks so the public site stays light on slow networks (WEB-03).
+// Everything except the home/marketing pages is split into its own chunk so first load stays light on slow networks (WEB-03).
 function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M) {
   const C = lazy(() => load().then((m) => ({ default: m[name] as ComponentType })));
   return (
@@ -19,6 +15,10 @@ function page<M extends Record<string, unknown>>(load: () => Promise<M>, name: k
     </Suspense>
   );
 }
+const auth = () => import("@/pages/auth/Auth");
+const content = () => import("@/pages/public/Content");
+const tutorsPublic = () => import("@/pages/public/Tutors");
+const shared = () => import("@/pages/shared/Shared");
 const parent = () => import("@/pages/parent/Parent");
 const tutor = () => import("@/pages/tutor/Tutor");
 const onboarding = () => import("@/pages/tutor/Onboarding");
@@ -51,33 +51,33 @@ const router = createBrowserRouter([
           { path: "/safety", element: <Safety /> },
           { path: "/pricing", element: <Pricing /> },
           { path: "/teach", element: <TeachWithUs /> },
-          { path: "/faq", element: <Faq /> },
-          { path: "/contact", element: <Contact /> },
-          { path: "/blog", element: <Blog /> },
-          { path: "/blog/:slug", element: <BlogPost /> },
+          { path: "/faq", element: page(content, "Faq") },
+          { path: "/contact", element: page(content, "Contact") },
+          { path: "/blog", element: page(content, "Blog") },
+          { path: "/blog/:slug", element: page(content, "BlogPost") },
           { path: "/legal/:page", element: <Legal /> },
-          { path: "/tutors", element: <FindTutors /> },
-          { path: "/tutors/:id", element: <TutorProfile /> },
-          { path: "/home-tutors/:subject/:area", element: <SeoLanding /> },
-          { path: "/reference/:token", element: <ReferenceForm /> },
-          { path: "/payments/callback", element: <PaymentCallback /> },
-          { path: "/dev/fake-checkout", element: <FakeCheckout /> },
+          { path: "/tutors", element: page(tutorsPublic, "FindTutors") },
+          { path: "/tutors/:id", element: page(tutorsPublic, "TutorProfile") },
+          { path: "/home-tutors/:subject/:area", element: page(content, "SeoLanding") },
+          { path: "/reference/:token", element: page(content, "ReferenceForm") },
+          { path: "/payments/callback", element: page(shared, "PaymentCallback") },
+          { path: "/dev/fake-checkout", element: page(shared, "FakeCheckout") },
         ],
       },
-      { path: "/login", element: <Login /> },
-      { path: "/signup", element: <Signup /> },
-      { path: "/forgot-password", element: <ForgotPassword /> },
-      { path: "/reset-password", element: <ResetPassword /> },
-      { path: "/verify-email", element: <VerifyEmail /> },
-      { path: "/verify", element: <RequireAuth><VerifyAccount /></RequireAuth> },
-      { path: "/account/2fa", element: <RequireAuth><TwoFactor /></RequireAuth> },
+      { path: "/login", element: page(auth, "Login") },
+      { path: "/signup", element: page(auth, "Signup") },
+      { path: "/forgot-password", element: page(auth, "ForgotPassword") },
+      { path: "/reset-password", element: page(auth, "ResetPassword") },
+      { path: "/verify-email", element: page(auth, "VerifyEmail") },
+      { path: "/verify", element: <RequireAuth>{page(auth, "VerifyAccount")}</RequireAuth> },
+      { path: "/account/2fa", element: <RequireAuth>{page(auth, "TwoFactor")}</RequireAuth> },
       {
         element: <RequireAuth><AppLayout area="auto" /></RequireAuth>,
         children: [
-          { path: "/account", element: <Account /> },
-          { path: "/notifications", element: <Notifications /> },
-          { path: "/messages", element: <Messages /> },
-          { path: "/messages/:id", element: <Messages /> },
+          { path: "/account", element: page(shared, "Account") },
+          { path: "/notifications", element: page(shared, "Notifications") },
+          { path: "/messages", element: page(shared, "Messages") },
+          { path: "/messages/:id", element: page(shared, "Messages") },
         ],
       },
       {

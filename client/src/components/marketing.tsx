@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, Bell, CheckCircle2, ChevronDown, Clock, KeyRound, MapPin, ShieldCheck, Sparkles, Star, Wallet } from "lucide-react";
-import { AnimatePresence, animate, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useInView } from "react-intersection-observer";
 
@@ -55,8 +55,15 @@ export function Counter({ to, suffix = "", prefix = "", duration = 1.6 }: { to: 
   const [value, setValue] = useState(0);
   useEffect(() => {
     if (!inView) return;
-    const controls = animate(0, to, { duration, ease: [0.22, 1, 0.36, 1], onUpdate: (v) => setValue(Math.round(v)) });
-    return () => controls.stop();
+    let frame = 0;
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / (duration * 1000));
+      setValue(Math.round(to * (1 - Math.pow(1 - p, 3)))); // ease-out cubic
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [inView, to, duration]);
   return <span ref={ref}>{prefix}{value.toLocaleString("en-NG")}{suffix}</span>;
 }

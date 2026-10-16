@@ -2,7 +2,7 @@ import {
   ArrowRight, Baby, CalendarDays, CalendarPlus, Download, GraduationCap, MapPin, MessageSquare, Pencil, Plus, Receipt, RefreshCw, Search, Sparkles,
   Star, UserRoundPlus, Wallet as WalletIcon, Clock, Target, Banknote, Globe,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 

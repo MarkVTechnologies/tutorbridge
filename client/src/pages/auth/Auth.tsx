@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { KeyRound, Lock, Mail, Phone, ShieldCheck, UserRound, Wallet } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 
 import { Logo } from "@/components/Layout";
 import { Seo } from "@/components/Seo";

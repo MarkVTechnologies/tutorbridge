@@ -4,8 +4,8 @@ import {
   ListChecks, LogOut, Mail, MapPin, Menu, MessageSquare, MessageSquareWarning, Phone, ScrollText, Search, Settings, ShieldCheck, Siren, Star,
   UserRound, Users, Video, Wallet, X, Baby, type LucideIcon,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "@/lib/motion";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "@/lib/api";
@@ -16,15 +16,17 @@ import type { Me } from "@/lib/types";
 import { Avatar, ButtonLink } from "./ui";
 
 export function LogoMark({ className }: { className?: string }) {
+  // Unique per instance: a gradient defined inside a hidden copy of the logo can't be referenced by a visible one.
+  const gid = `tb-g-${useId().replace(/:/g, "")}`;
   return (
     <svg viewBox="0 0 40 40" className={cn("size-9", className)} aria-hidden="true">
       <defs>
-        <linearGradient id="tb-g" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#1d8a60" />
           <stop offset="1" stopColor="#082f22" />
         </linearGradient>
       </defs>
-      <rect width="40" height="40" rx="12" fill="url(#tb-g)" />
+      <rect width="40" height="40" rx="12" fill={`url(#${gid})`} />
       <path d="M8 26c4.5-8.5 8.5-12.5 12-12.5S27.5 17.5 32 26" stroke="#fcbc4d" strokeWidth="3.4" fill="none" strokeLinecap="round" />
       <path d="M11 29h18" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
       <circle cx="20" cy="13.5" r="2.6" fill="#fff" />

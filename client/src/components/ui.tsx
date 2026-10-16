@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Inbox, Info, Loader2, Star, X, XCircle, type LucideIcon } from "lucide-react";
-import { AnimatePresence, motion, type HTMLMotionProps } from "motion/react";
+import { AnimatePresence, motion, type HTMLMotionProps } from "@/lib/motion";
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Title } from "react-head";
 import { Link } from "react-router-dom";

@@ -3,7 +3,7 @@ import {
   Home as HomeIcon, IdCard, KeyRound, Landmark, LineChart, MapPin, MessageSquareLock, PhoneCall, RefreshCw, Scale, Search, ShieldCheck, Siren, Sparkles,
   Star, TrendingUp, UserCheck, Users, Video, Wallet, Award, FileCheck2, ScrollText, type LucideIcon,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { lazy, Suspense, type ReactNode, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 

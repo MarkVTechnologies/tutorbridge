@@ -65,7 +65,14 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  overflow-x: clip; /* guard against stray horizontal scroll on phones; clip (unlike hidden) keeps sticky headers working */
   scroll-behavior: smooth;
+}
+
+/* Grid items default to min-width:auto, so wide content (tables, code boxes, long words) stretches the
+   whole column past the screen on phones. Let them shrink; wide children scroll inside their own box. */
+:where(.grid) > * {
+  min-width: 0;
 }
 
 body {

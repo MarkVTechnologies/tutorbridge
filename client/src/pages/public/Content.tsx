@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, Clock, FileText, Mail, MapPin, MessageSquare, Phone, Send, ShieldCheck, Siren, UserRound } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 

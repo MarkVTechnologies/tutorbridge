@@ -1,5 +1,5 @@
 import { Check, ChevronRight, KeyRound, type LucideIcon } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -95,11 +95,11 @@ export function StatusStepper({ steps, current }: { steps: { key: string; label:
 /** Big, legible check-in/out code display for the parent. */
 export function CodeDisplay({ label, code, dark }: { label: string; code: string; dark?: boolean }) {
   return (
-    <div>
+    <div className="w-full max-w-72">
       <p className={cn("flex items-center gap-1.5 text-[11px] font-semibold tracking-wider uppercase", dark ? "text-gold-200" : "text-brand-700")}><KeyRound className="size-3.5" /> {label}</p>
       <div className="mt-2 flex gap-1.5">
         {code.split("").map((d, i) => (
-          <span key={i} className={cn("flex h-12 w-10 items-center justify-center rounded-xl font-display text-2xl font-bold sm:w-11",
+          <span key={i} className={cn("flex h-12 min-w-0 max-w-11 flex-1 items-center justify-center rounded-xl font-display text-2xl font-bold",
             dark ? "bg-white/10 text-white ring-1 ring-white/15" : "bg-white text-ink-950 shadow-soft ring-1 ring-ink-100")}>{d}</span>
         ))}
       </div>

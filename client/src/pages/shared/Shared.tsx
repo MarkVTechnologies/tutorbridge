@@ -2,7 +2,7 @@ import {
   ArrowLeft, ArrowRight, Banknote, Bell, BellOff, CalendarCheck, CheckCheck, CheckCircle2, Clock, CreditCard, Download, KeyRound, Lock, Mail, MessageSquare,
   MessageSquareLock, Send, ShieldCheck, Siren, Smartphone, Sparkles, XCircle, type LucideIcon,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";

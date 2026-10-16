@@ -7,6 +7,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import App from "./App";
 import { ApiError } from "./lib/api";
+import { LazyMotion, loadMotionFeatures } from "./lib/motion";
 import { AuthProvider } from "./lib/auth";
 import "./index.css";
 
@@ -26,7 +27,9 @@ createRoot(document.getElementById("root")!).render(
     <HeadProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <App />
+          <LazyMotion features={loadMotionFeatures}>
+            <App />
+          </LazyMotion>
           <ToastContainer position="bottom-right" transition={Slide} autoClose={3500} hideProgressBar newestOnTop closeOnClick pauseOnFocusLoss={false} theme="light" />
         </AuthProvider>
       </QueryClientProvider>

@@ -2,7 +2,7 @@ import {
   ArrowRight, Banknote, BookOpen, CalendarCheck, CalendarDays, Check, CheckCircle2, ClipboardCheck, Clock, Download, Hourglass, Inbox, KeyRound, LogIn, LogOut, MapPin,
   MessageSquare, Send, ShieldAlert, Sparkles, Star, Target, TrendingUp, Users, X,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "@/lib/motion";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 

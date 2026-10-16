@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, BookOpen, Clock, GraduationCap, Lock, MapPin, Quote, SlidersHorizontal, Sparkles, Target, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "@/lib/motion";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -62,7 +62,7 @@ export function FindTutors() {
               {filterPanel}
             </div>
           </aside>
-          <div>
+          <div className="min-w-0">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <p className="text-ink-600">{data ? <><strong className="text-ink-950">{data.count}</strong> vetted tutor{data.count === 1 ? "" : "s"}</> : "Searching…"}</p>
               <div className="flex items-center gap-2">
