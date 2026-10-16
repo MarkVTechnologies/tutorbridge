@@ -55,6 +55,9 @@ DEFAULTS = {
     },
     # Payments
     "active_gateway": "paystack",
+    # Promotions (PAY-10)
+    "referral_credit_kobo": 200_000,  # each side, when a referred family completes their first package
+    "referrals_enabled": True,
 }
 
 CACHE_PREFIX = "setting:"

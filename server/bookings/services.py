@@ -33,7 +33,7 @@ def lesson_price(hourly_rate_kobo, minutes):
     return int(round(hourly_rate_kobo * minutes / 60))
 
 
-def quote(*, parent, tutor, package_size, lesson_minutes, request=None):
+def quote(*, parent, tutor, package_size, lesson_minutes, request=None, promo_code=None, lock_promo=False):
     """Price a booking. Matching fee applies to a request's first (trial) booking and is credited against its first package."""
     if package_size not in config.get("package_sizes"):
         raise ValidationError({"package_size": "Unsupported package size."})
@@ -50,7 +50,12 @@ def quote(*, parent, tutor, package_size, lesson_minutes, request=None):
             matching_fee = fee
         elif package_size > 1 and fee_paid and not credited:
             matching_credit = fee
-    total = price * package_size + matching_fee - matching_credit
+    promo, discount = None, 0
+    if promo_code:
+        from payments.promotions import evaluate
+
+        promo, discount = evaluate(promo_code, parent, price * package_size, package_size, lock=lock_promo)
+    total = price * package_size + matching_fee - matching_credit - discount
     return {
         "hourly_rate_kobo": tutor.hourly_rate_kobo,
         "lesson_price_kobo": price,
@@ -58,6 +63,9 @@ def quote(*, parent, tutor, package_size, lesson_minutes, request=None):
         "lessons_total_kobo": price * package_size,
         "matching_fee_kobo": matching_fee,
         "matching_credit_kobo": matching_credit,
+        "discount_kobo": discount,
+        "promo_code": promo.code if promo else None,
+        "promo": promo,
         "total_kobo": total,
         "commission_pct": commission_for(tutor),
         "wallet_balance_kobo": ledger.balance(ledger.wallet(parent)),
@@ -105,7 +113,8 @@ def check_availability(tutor, schedule, lesson_minutes):
 
 
 @transaction.atomic
-def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minutes, schedule, start_date, request=None, address="", area=None, is_online=False):
+def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minutes, schedule, start_date, request=None, address="", area=None,
+                   is_online=False, promo_code=None):
     from tutors.models import TutorStatus
 
     tutor = lock_tutor_calendar(tutor)
@@ -118,7 +127,9 @@ def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minut
     if start_date < timezone.localdate():
         raise ValidationError({"start_date": "Start date cannot be in the past."})
     check_availability(tutor, schedule, lesson_minutes)
-    q = quote(parent=parent, tutor=tutor, package_size=package_size, lesson_minutes=lesson_minutes, request=request)
+    # lock_promo: the usage-limit check and the redemption insert can't interleave between two parents.
+    q = quote(parent=parent, tutor=tutor, package_size=package_size, lesson_minutes=lesson_minutes, request=request,
+              promo_code=promo_code, lock_promo=True)
     slots = week_dates(start_date, schedule, package_size, lesson_minutes)
     slots = [s for s in slots if s[0] > timezone.now()]
     if len(slots) < package_size:
@@ -133,10 +144,13 @@ def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minut
         package_size=package_size, lesson_minutes=lesson_minutes, schedule=schedule, start_date=start_date,
         hourly_rate_kobo=q["hourly_rate_kobo"], lesson_price_kobo=q["lesson_price_kobo"], commission_pct=q["commission_pct"],
         matching_fee_kobo=q["matching_fee_kobo"], matching_credit_kobo=q["matching_credit_kobo"], total_kobo=q["total_kobo"],
-        address=address, area=area, is_online=is_online,
+        promo=q["promo"], discount_kobo=q["discount_kobo"], address=address, area=area, is_online=is_online,
     )
     booking.subjects.set(subjects)
     _create_lessons(booking, slots)
+    from payments.promotions import record_redemption
+
+    record_redemption(booking)
     return booking
 
 
@@ -288,12 +302,18 @@ def reassign(booking):
 def cancel_booking(booking, by_user, reason=""):
     """Cancel all future lessons, returning escrow to the wallet (staff, or parent before acceptance)."""
     booking = Booking.objects.select_for_update().get(pk=booking.pk)
+    refunded = 0
     for lesson in booking.lessons.filter(status=LessonStatus.SCHEDULED):
         lesson.status, lesson.cancelled_at, lesson.cancelled_by, lesson.cancel_reason = LessonStatus.CANCELLED, timezone.now(), "staff" if by_user.is_staff_member else "parent", reason[:255]
         lesson.escrow_status = EscrowStatus.REFUNDED
         lesson.save()
         if booking.status != BookingStatus.AWAITING_PAYMENT:
             pay.refund_lesson(lesson, 0, "booking cancelled")
+            refunded += 1
+    if refunded:
+        from payments.promotions import claw_back_discount
+
+        claw_back_discount(booking, refunded)
     booking.status, booking.cancel_reason = BookingStatus.CANCELLED, reason
     booking.save(update_fields=["status", "cancel_reason"])
     audit(by_user, "booking.cancel", "booking", booking.pk, reason=reason)
@@ -440,6 +460,10 @@ def _maybe_complete_booking(booking):
     if booking.status == BookingStatus.ACTIVE and not booking.lessons.filter(status__in=open_states).exists():
         booking.status = BookingStatus.COMPLETED
         booking.save(update_fields=["status"])
+        if not booking.is_trial:
+            from payments.promotions import grant_referral_reward
+
+            grant_referral_reward(booking)
 
 
 @transaction.atomic

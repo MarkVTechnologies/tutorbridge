@@ -67,6 +67,9 @@ class User(AbstractBaseUser):
     consent_marketing = models.BooleanField(default=False)
     consent_location = models.BooleanField(default=False)
     notification_prefs = models.JSONField(default=dict, blank=True)  # MSG-07
+    # PAY-10 referrals
+    referral_code = models.CharField(max_length=12, unique=True, null=True, blank=True)
+    referred_by = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="referrals")
 
     objects = UserManager()
 

@@ -46,6 +46,8 @@ class Booking(models.Model):
     declined_tutor_ids = models.JSONField(default=list, blank=True)
     replaces = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="replacements")
     renews = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="renewals")  # BKG-06
+    promo = models.ForeignKey("payments.PromoCode", null=True, blank=True, on_delete=models.PROTECT, related_name="bookings")
+    discount_kobo = models.BigIntegerField(default=0)
     auto_renew = models.BooleanField(default=False)
     cancel_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

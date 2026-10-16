@@ -41,8 +41,9 @@ def quote(request):
     tutor = get_object_or_404(TutorProfile, pk=request.data.get("tutor"))
     req = LessonRequest.objects.filter(pk=request.data.get("request"), parent__user=request.user).first() if request.data.get("request") else None
     q = services.quote(parent=request.user.parent_profile, tutor=tutor, package_size=int(request.data.get("package_size", 1)),
-                       lesson_minutes=int(request.data.get("lesson_minutes", 60)), request=req)
+                       lesson_minutes=int(request.data.get("lesson_minutes", 60)), request=req, promo_code=request.data.get("promo_code") or None)
     q.pop("commission_pct")  # internal
+    q.pop("promo")
     return Response(q)
 
 
@@ -94,6 +95,7 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         booking = services.create_booking(
             parent=parent, tutor=tutor, child=child, subjects=subjects, package_size=d["package_size"], lesson_minutes=d["lesson_minutes"],
             schedule=d["schedule"], start_date=d["start_date"], request=req, address=address, area=area, is_online=d["is_online"],
+            promo_code=d.get("promo_code") or None,
         )
         balance = ledger.balance(ledger.wallet(parent))
         due = booking.total_kobo - balance

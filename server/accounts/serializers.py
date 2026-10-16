@@ -35,6 +35,7 @@ class SignupSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
     consent_terms = serializers.BooleanField()
     consent_marketing = serializers.BooleanField(required=False, default=False)
+    ref = serializers.CharField(required=False, allow_blank=True, max_length=12)  # referral code from a friend's link
 
     def validate_email(self, value):
         value = value.lower()

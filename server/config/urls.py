@@ -103,6 +103,8 @@ api = [
     path("payments/<str:reference>/receipt/", payments.receipt),
     path("wallet/", payments.wallet),
     path("saved-cards/<int:pk>/", payments.remove_saved_card),
+    path("referrals/", payments.referrals),
+    path("referrals/<str:code>/", payments.referral_lookup),
     path("earnings/", payments.earnings),
     path("earnings/statement/", payments.statement),
     path("banks/", payments.banks),
@@ -168,6 +170,8 @@ api = [
     path("staff/subjects/", bo.subject_create),
     path("staff/areas/", bo.area_create),
     path("staff/audit/", bo.audit_log),
+    path("staff/promos/", bo.promos),
+    path("staff/promos/<int:pk>/", bo.promo_update),
     path("staff/exports/<str:name>/", bo.export_csv),
     path("", include(router.urls)),
 ]

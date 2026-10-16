@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight, Banknote, Bell, BookOpen, CalendarDays, ChevronDown, ClipboardCheck, FileBarChart, Gavel, GraduationCap, Inbox, LayoutDashboard,
   ListChecks, LogOut, Mail, MapPin, Menu, MessageSquare, MessageSquareWarning, Phone, ScrollText, Search, Settings, ShieldCheck, Siren, Star,
-  UserRound, Users, Video, Wallet, X, Baby, type LucideIcon,
+  Tag, UserRound, Users, Video, Wallet, X, Baby, type LucideIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "@/lib/motion";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -223,6 +223,7 @@ const appNav: Record<"parent" | "tutor" | "staff", NavGroup[]> = {
     { title: "Money", items: [
       { to: "/staff/finance", label: "Finance", icon: FileBarChart, show: (m) => hasPerm(m, "finance.view") },
       { to: "/staff/payouts", label: "Payouts", icon: Banknote, show: (m) => hasPerm(m, "finance.view") },
+      { to: "/staff/promos", label: "Promo codes", icon: Tag, show: (m) => hasPerm(m, "promos.manage") },
     ] },
     { title: "Trust & safety", items: [
       { to: "/staff/incidents", label: "Safety incidents", icon: Siren, show: (m) => hasPerm(m, "safety.view") },

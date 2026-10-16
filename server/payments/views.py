@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from accounts.models import OTPCode
@@ -227,4 +228,39 @@ def bank_account(request):
     c.result = {"account_name": bank.account_name, "bank": bank.bank_name, "last4": bank.account_last4}
     c.save()
     return Response(_bank_json(bank), status=201)
+
+
+# --- Referrals (PAY-10) ------------------------------------------------------
+
+
+@api_view(["GET"])
+def referrals(request):
+    from core import config
+    from payments.models import ReferralReward
+    from payments.promotions import referral_code_for
+
+    user = request.user
+    if user.is_staff_member:
+        return Response({"detail": "Referrals are for parents and tutors."}, status=403)
+    code = referral_code_for(user)
+    rewards = ReferralReward.objects.filter(referrer=user)
+    return Response({
+        "code": code,
+        "link": f"{settings.SITE_URL}/signup?ref={code}",
+        "enabled": config.get("referrals_enabled"),
+        "credit_kobo": config.get("referral_credit_kobo"),
+        "invited": user.referrals.count(),
+        "rewarded": rewards.count(),
+        "earned_kobo": sum(r.amount_kobo for r in rewards),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def referral_lookup(request, code):
+    """Shown on the signup page: who invited you (first name only)."""
+    from payments.promotions import find_referrer
+
+    u = find_referrer(code)
+    return Response({"valid": bool(u), "first_name": u.first_name if u else None})
 

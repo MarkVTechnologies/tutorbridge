@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { DateChip, greeting, LessonRow, QuickAction, WelcomeBanner } from "@/components/app";
+import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import {
   Alert, Avatar, Badge, Button, ButtonLink, Card, EmptyState, ErrorAlert, Input, Loading, Modal, PageHeader, Select, Stat, StatusBadge, Table, Tabs, Td, Textarea,
@@ -100,6 +101,7 @@ export function TutorDashboard() {
           <QuickAction to="/tutor/onboarding" icon={ClipboardCheck} title="Profile & vetting" body="Your subjects, areas, availability and checks" />
           <QuickAction to="/tutor/invitations" icon={Inbox} title="Invitations" body="Requests our team invited you to" />
           <QuickAction to="/messages" icon={MessageSquare} title="Messages" body="Chat with families you teach" />
+          {active && <ReferralCard audience="tutor" />}
           {p.strikes > 0 && <Alert tone="amber" title={`${p.strikes} strike${p.strikes > 1 ? "s" : ""} on your record`}>Three strikes trigger a review. Strikes come from no-shows and late cancellations.</Alert>}
         </div>
       </div>

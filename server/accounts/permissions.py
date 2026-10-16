@@ -16,6 +16,7 @@ ROLE_PERMISSIONS = {
         "refunds.process",
         "users.view",
         "reports.export",
+        "promos.manage",
     },
     Role.SAFETY: {"safety.view", "safety.act", "disputes.view", "disputes.resolve", "users.view", "users.suspend", "messages.view"},
 }

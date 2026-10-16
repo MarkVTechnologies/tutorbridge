@@ -185,6 +185,9 @@ def reserve_booking(booking):
     with transaction.atomic():
         if booking.matching_credit_kobo:
             ledger.transfer(f"matchcredit:{booking.pk}", "matching_credit", f"Matching fee credited to package #{booking.pk}", revenue, wallet, booking.matching_credit_kobo, booking=booking)
+        from payments.promotions import fund_discount
+
+        fund_discount(booking)
         lines = [(wallet, lessons_total + booking.matching_fee_kobo, 0), (esc, 0, lessons_total)]
         if booking.matching_fee_kobo:
             lines.append((revenue, 0, booking.matching_fee_kobo))

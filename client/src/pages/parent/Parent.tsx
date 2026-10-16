@@ -1,18 +1,19 @@
 import {
   ArrowRight, Baby, CalendarDays, CalendarPlus, Download, GraduationCap, MapPin, MessageSquare, Pencil, Plus, Receipt, RefreshCw, Search, Sparkles,
-  Star, UserRoundPlus, Wallet as WalletIcon, Clock, Target, Banknote, Globe, CreditCard,
+  Star, UserRoundPlus, Wallet as WalletIcon, Clock, Target, Banknote, Globe, CreditCard, Tag,
 } from "lucide-react";
 import { motion } from "@/lib/motion";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { CodeDisplay, DateChip, greeting, LessonRow, QuickAction, StatusStepper, WelcomeBanner } from "@/components/app";
+import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
 import { KeyValue, ScheduleEditor, TutorCard } from "@/components/shared";
 import {
   Alert, Avatar, Badge, Button, ButtonLink, Card, Checkbox, EmptyState, ErrorAlert, Input, Loading, Modal, PageHeader, Select, StarInput, Stat, StatusBadge, Table, Td, Textarea,
 } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, type ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { dateOnly, dateTime, naira, schedule as fmtSchedule, timeOnly, toKobo, todayISO } from "@/lib/format";
@@ -98,6 +99,7 @@ export function ParentDashboard() {
             <QuickAction to="/parent/children" icon={Baby} title="Your children" body="Profiles, classes and learning notes" />
             <QuickAction to="/parent/wallet" icon={Receipt} title="Payments & receipts" body="Top up, download receipts, see wallet activity" />
             <QuickAction to="/messages" icon={MessageSquare} title="Messages" body="Chat with your tutors, safely" />
+            <ReferralCard audience="parent" />
           </div>
         </div>
       </div>
@@ -360,7 +362,7 @@ export function RequestDetail() {
   );
 }
 
-type Quote = { lesson_price_kobo: number; package_size: number; lessons_total_kobo: number; matching_fee_kobo: number; matching_credit_kobo: number; total_kobo: number; wallet_balance_kobo: number };
+type Quote = { lesson_price_kobo: number; package_size: number; lessons_total_kobo: number; matching_fee_kobo: number; matching_credit_kobo: number; discount_kobo: number; promo_code: string | null; total_kobo: number; wallet_balance_kobo: number };
 
 function BookModal({ tutor, request, onClose }: { tutor: TutorPublic; request: LessonRequest; onClose: () => void }) {
   const { data: ref } = useRefData();
@@ -370,11 +372,19 @@ function BookModal({ tutor, request, onClose }: { tutor: TutorPublic; request: L
   const [slots, setSlots] = useState<Slot[]>(request.schedule);
   const [start, setStart] = useState(request.start_date < todayISO(1) ? todayISO(1) : request.start_date);
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState("");
+  const [promoError, setPromoError] = useState<string | null>(null);
   useEffect(() => {
-    api.post<Quote>("/bookings-quote/", { tutor: tutor.id, package_size: pkg, lesson_minutes: minutes, request: request.id }).then(setQuote).catch(() => setQuote(null));
-  }, [tutor.id, pkg, minutes, request.id]);
+    api.post<Quote>("/bookings-quote/", { tutor: tutor.id, package_size: pkg, lesson_minutes: minutes, request: request.id, promo_code: promo || undefined })
+      .then((q) => { setQuote(q); if (promo) setPromoError(null); })
+      .catch((e: ApiError) => {
+        if (promo && e.field?.("promo_code")) { setPromoError(e.field("promo_code") ?? null); setPromo(""); } else setQuote(null);
+      });
+  }, [tutor.id, pkg, minutes, request.id, promo]);
   const book = useAction(() => api.post<{ booking: Booking; payment: { authorization_url: string } | null }>("/bookings/book/", {
     tutor: tutor.id, child: request.child, subjects: request.subjects, package_size: pkg, lesson_minutes: minutes, schedule: slots, start_date: start, request: request.id,
+    promo_code: promo || undefined,
   }), [["wallet"], ["shortlist", String(request.id)]]);
   const due = quote ? Math.max(0, quote.total_kobo - quote.wallet_balance_kobo) : 0;
   const subjectsTaught = useMemo(() => new Set(tutor.subjects.map((s) => s.subject_name)), [tutor]);
@@ -404,11 +414,16 @@ function BookModal({ tutor, request, onClose }: { tutor: TutorPublic; request: L
       </Select>
       <div><p className="mb-2 text-[13px] font-semibold text-ink-700">Weekly schedule</p><ScheduleEditor value={slots} onChange={setSlots} /></div>
       <Input label="First lesson on or after" type="date" min={todayISO(1)} value={start} onChange={(e) => setStart(e.target.value)} />
+      <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); setPromo(promoInput.trim()); }}>
+        <div className="flex-1"><Input label="Promo code (optional)" icon={Tag} value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }} error={promoError ?? undefined} /></div>
+        {quote?.promo_code ? <Button type="button" variant="ghost" onClick={() => { setPromo(""); setPromoInput(""); }}>Remove</Button> : <Button type="submit" variant="secondary" disabled={!promoInput.trim()}>Apply</Button>}
+      </form>
       {quote && (
         <div className="rounded-2xl bg-ink-50/80 p-4 text-sm">
           <div className="flex justify-between py-1"><span className="text-ink-600">{quote.package_size} × {naira(quote.lesson_price_kobo)}</span><span>{naira(quote.lessons_total_kobo)}</span></div>
           {quote.matching_fee_kobo > 0 && <div className="flex justify-between py-1"><span className="text-ink-600">Matching fee <span className="text-ink-400">(credited on your first package)</span></span><span>{naira(quote.matching_fee_kobo)}</span></div>}
           {quote.matching_credit_kobo > 0 && <div className="flex justify-between py-1 text-brand-700"><span>Matching fee credit</span><span>−{naira(quote.matching_credit_kobo)}</span></div>}
+          {quote.discount_kobo > 0 && <div className="flex justify-between py-1 text-brand-700"><span>Promo {quote.promo_code}</span><span>−{naira(quote.discount_kobo)}</span></div>}
           {quote.wallet_balance_kobo > 0 && <div className="flex justify-between py-1 text-brand-700"><span>From your wallet</span><span>−{naira(Math.min(quote.wallet_balance_kobo, quote.total_kobo))}</span></div>}
           <div className="mt-2 flex justify-between border-t border-ink-200 pt-3 font-display text-lg font-bold"><span>To pay now</span><span>{naira(due)}</span></div>
         </div>

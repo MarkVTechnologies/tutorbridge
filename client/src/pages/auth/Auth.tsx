@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { KeyRound, Lock, Mail, Phone, ShieldCheck, UserRound, Wallet } from "lucide-react";
+import { Gift, KeyRound, Lock, Mail, Phone, ShieldCheck, UserRound, Wallet } from "lucide-react";
 import { motion } from "@/lib/motion";
 
 import { Logo } from "@/components/Layout";
@@ -9,7 +9,7 @@ import { Seo } from "@/components/Seo";
 import { Alert, Button, Checkbox, ErrorAlert, Input, Loading, Select, Tabs } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { homeFor, useAuth } from "@/lib/auth";
-import { useAction } from "@/lib/hooks";
+import { useAction, useApi } from "@/lib/hooks";
 import type { Me } from "@/lib/types";
 
 function AuthShell({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -120,10 +120,18 @@ export function Signup() {
   const nav = useNavigate();
   const [role, setRole] = useState<"parent" | "tutor">(params.get("role") === "tutor" ? "tutor" : "parent");
   const [f, setF] = useState({ first_name: "", last_name: "", email: "", phone: "", gender: "", password: "", consent_terms: false, consent_marketing: false });
-  const signup = useAction(() => api.post<Me>("/auth/signup/", { ...f, role }));
+  const ref = params.get("ref") ?? "";
+  const inviter = useApi<{ valid: boolean; first_name: string | null }>(ref ? `/referrals/${encodeURIComponent(ref)}/` : null);
+  const signup = useAction(() => api.post<Me>("/auth/signup/", { ...f, role, ref }));
   const err = signup.error;
   return (
     <AuthShell title="Create your account" subtitle={role === "parent" ? "Find a vetted tutor for your child." : "Apply to teach with TutorBridge."}>
+      {inviter.data?.valid && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-gold-50 p-3.5 text-sm text-ink-800 ring-1 ring-gold-200">
+          <Gift className="size-5 shrink-0 text-gold-600" />
+          <span><strong>{inviter.data.first_name}</strong> invited you. Complete your first package and you'll both get wallet credit.</span>
+        </div>
+      )}
       <Tabs className="mb-6 flex w-full" value={role} onChange={setRole} options={[{ value: "parent", label: "I'm a parent" }, { value: "tutor", label: "I'm a tutor" }]} />
       <form className="space-y-4" onSubmit={(e) => {
         e.preventDefault();

@@ -39,6 +39,12 @@ def csrf(request):
     return Response({"csrfToken": get_token(request)})
 
 
+def _referrer(code):
+    from payments.promotions import find_referrer
+
+    return find_referrer(code)
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([LoginThrottle])
@@ -51,6 +57,7 @@ def signup(request):
             email=d["email"], phone=d["phone"], password=d["password"], first_name=d["first_name"],
             last_name=d["last_name"], gender=d.get("gender", ""), role=d["role"],
             consent_terms_at=timezone.now(), consent_marketing=d.get("consent_marketing", False),
+            referred_by=_referrer(d.get("ref")),
         )
         if user.role == Role.PARENT:
             from parents.models import ParentProfile

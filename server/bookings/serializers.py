@@ -56,6 +56,7 @@ class BookingSerializer(serializers.ModelSerializer):
     lessons_done = serializers.SerializerMethodField()
     thread_id = serializers.SerializerMethodField()
     renewed_by = serializers.SerializerMethodField()
+    promo_code = serializers.CharField(source="promo.code", read_only=True, default=None)
     amount_due_kobo = serializers.SerializerMethodField()
 
     class Meta:
@@ -63,7 +64,7 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             "id", "status", "status_display", "tutor_id", "tutor_name", "parent_name", "child_name", "child_class", "subject_names",
             "is_trial", "package_size", "lesson_minutes", "schedule", "start_date", "hourly_rate_kobo", "lesson_price_kobo",
-            "matching_fee_kobo", "matching_credit_kobo", "total_kobo", "area_name", "address_visible", "is_online", "online_link",
+            "matching_fee_kobo", "matching_credit_kobo", "discount_kobo", "promo_code", "total_kobo", "area_name", "address_visible", "is_online", "online_link",
             "offer_expires_at", "accepted_at", "auto_renew", "next_lesson", "lessons_done", "thread_id", "created_at",
             "renews", "renewed_by", "amount_due_kobo",
         ]
@@ -115,6 +116,7 @@ class CreateBookingSerializer(serializers.Serializer):
     address = serializers.CharField(required=False, allow_blank=True)
     area = serializers.IntegerField(required=False, allow_null=True)
     is_online = serializers.BooleanField(required=False, default=False)
+    promo_code = serializers.CharField(required=False, allow_blank=True, max_length=30)
 
     def validate_schedule(self, value):
         from matching.serializers import validate_schedule

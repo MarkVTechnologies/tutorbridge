@@ -119,6 +119,10 @@ const SETTING_LABELS: Record<string, string> = {
   payout_min_kobo: "Minimum payout (₦)",
   match_weights: "Matching weights",
   active_gateway: "Active payment gateway",
+  referral_credit_kobo: "Referral credit, each side (₦)",
+  referrals_enabled: "Referral programme switched on",
+  renewal_trigger_lessons_left: "Auto-renew when this many lessons remain",
+  renewal_payment_hours: "Hours to pay for a renewal before slots are released",
 };
 
 /** Money settings are stored in kobo but edited in naira; booleans as switches; nested values as JSON. */

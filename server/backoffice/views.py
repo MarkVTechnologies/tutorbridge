@@ -921,3 +921,76 @@ def export_csv(request, name):
     audit(request.user, "export", "export", name, request=request)
     return resp
 
+
+# --- Promo codes (PAY-10) ------------------------------------------------------
+
+PROMO_FIELDS = ["description", "kind", "value", "max_discount_kobo", "min_spend_kobo", "first_booking_only", "packages_only",
+                "valid_from", "valid_until", "max_uses", "max_uses_per_parent", "is_active"]
+
+
+def _promo_json(p):
+    from payments.models import PromoRedemption
+
+    uses = PromoRedemption.objects.filter(promo=p).exclude(booking__status="cancelled")
+    return {"id": p.pk, "code": p.code, **{f: getattr(p, f) for f in PROMO_FIELDS}, "uses": uses.count(),
+            "discount_given_kobo": sum(uses.values_list("discount_kobo", flat=True)), "created_at": p.created_at}
+
+
+def _promo_clean(data, partial=False):
+    from django.utils.dateparse import parse_datetime
+
+    from payments.models import PromoCode
+
+    out = {}
+    for f in PROMO_FIELDS:
+        if f not in data:
+            continue
+        v = data[f]
+        if f in ("valid_from", "valid_until"):
+            v = parse_datetime(v) if v else None
+        elif f in ("max_discount_kobo", "max_uses") and v in ("", None):
+            v = None
+        out[f] = v
+    kind = out.get("kind")
+    if not partial and kind not in PromoCode.Kind.values:
+        raise ValidationError({"kind": "Choose percent or fixed."})
+    value = out.get("value")
+    if value is not None:
+        value = int(value)
+        if value <= 0 or (kind == "percent" and value > 100):
+            raise ValidationError({"value": "Percent must be 1-100; fixed amounts must be positive."})
+        out["value"] = value
+    return out
+
+
+@api_view(["GET", "POST"])
+@permission_classes([staff_perm("promos.manage")])
+def promos(request):
+    from payments.models import PromoCode
+    from payments.promotions import normalise
+
+    if request.method == "POST":
+        code = normalise(request.data.get("code"))
+        if not code or not code.replace("-", "").isalnum():
+            raise ValidationError({"code": "Use letters, numbers and dashes only."})
+        if PromoCode.objects.filter(code=code).exists():
+            raise ValidationError({"code": "That code already exists."})
+        p = PromoCode.objects.create(code=code, created_by=request.user, **_promo_clean(request.data))
+        audit(request.user, "promo.create", "promo", p.pk, after={"code": p.code, "kind": p.kind, "value": p.value, "max_uses": p.max_uses}, request=request)
+        return Response(_promo_json(p), status=201)
+    return Response([_promo_json(p) for p in PromoCode.objects.all()])
+
+
+@api_view(["PATCH"])
+@permission_classes([staff_perm("promos.manage")])
+def promo_update(request, pk):
+    from payments.models import PromoCode
+
+    p = get_object_or_404(PromoCode, pk=pk)
+    changes = _promo_clean(request.data, partial=True)
+    for k, v in changes.items():
+        setattr(p, k, v)
+    p.save()
+    audit(request.user, "promo.update", "promo", p.pk, after={k: str(v) for k, v in changes.items()}, request=request)
+    return Response(_promo_json(p))
+

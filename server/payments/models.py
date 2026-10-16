@@ -13,10 +13,11 @@ class AccountKind(models.TextChoices):
     PLATFORM_REVENUE = "platform_revenue", "Platform revenue"
     GATEWAY_FEES = "gateway_fees", "Gateway fees expense"
     PAYOUTS_IN_TRANSIT = "payouts_in_transit", "Payouts in transit"
+    PROMOTIONS = "promotions", "Promotions & referrals expense"
 
 
 # Debit-normal accounts (assets/expenses): balance = debits - credits. All others: credits - debits.
-DEBIT_NORMAL = {AccountKind.GATEWAY_CLEARING, AccountKind.GATEWAY_FEES}
+DEBIT_NORMAL = {AccountKind.GATEWAY_CLEARING, AccountKind.GATEWAY_FEES, AccountKind.PROMOTIONS}
 
 
 class LedgerAccount(models.Model):
@@ -186,3 +187,54 @@ class ReconciliationRun(models.Model):
     checked = models.PositiveIntegerField(default=0)
     mismatches = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PromoCode(models.Model):
+    """PAY-10: discount codes. The platform funds the discount; tutors are always paid their full lesson price."""
+
+    class Kind(models.TextChoices):
+        PERCENT = "percent", "Percentage off"
+        FIXED = "fixed", "Fixed amount off"
+
+    code = models.CharField(max_length=30, unique=True)  # stored upper-case
+    description = models.CharField(max_length=200, blank=True)
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    value = models.PositiveIntegerField()  # percent (1-100) or kobo
+    max_discount_kobo = models.BigIntegerField(null=True, blank=True)
+    min_spend_kobo = models.BigIntegerField(default=0)
+    first_booking_only = models.BooleanField(default=False)
+    packages_only = models.BooleanField(default=False)  # not valid on single trial lessons
+    valid_from = models.DateTimeField(null=True, blank=True)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    max_uses = models.PositiveIntegerField(null=True, blank=True)
+    max_uses_per_parent = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.code
+
+
+class PromoRedemption(models.Model):
+    """One use of a promo code. Uses on cancelled bookings don't count against limits."""
+
+    promo = models.ForeignKey(PromoCode, on_delete=models.PROTECT, related_name="redemptions")
+    parent = models.ForeignKey("parents.ParentProfile", on_delete=models.PROTECT, related_name="promo_redemptions")
+    booking = models.OneToOneField("bookings.Booking", on_delete=models.PROTECT, related_name="promo_redemption")
+    discount_kobo = models.BigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ReferralReward(models.Model):
+    """Credit given once per referred family, when they complete their first package."""
+
+    referrer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="referral_rewards_given")
+    referred = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="referral_reward")
+    booking = models.ForeignKey("bookings.Booking", on_delete=models.PROTECT, related_name="+")
+    amount_kobo = models.BigIntegerField()  # paid to each side
+    created_at = models.DateTimeField(auto_now_add=True)
+
