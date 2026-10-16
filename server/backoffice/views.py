@@ -996,6 +996,37 @@ def promo_update(request, pk):
 
 
 @api_view(["GET"])
+@permission_classes([staff_perm("reports.view")])
+def pilot_reports(request):
+    """ADM-07: success metrics vs pilot targets, weekly trends, cohorts, fill rate by area. ?days=30|90|180, ?export=csv."""
+    from backoffice.reports import pilot_report
+
+    try:
+        days = int(request.query_params.get("days", 30))
+    except ValueError:
+        raise ValidationError({"days": "Use a number of days."}) from None
+    if days not in (7, 30, 90, 180, 365):
+        raise ValidationError({"days": "Choose 7, 30, 90, 180 or 365."})
+    report = pilot_report(days=days)
+    if request.query_params.get("export") != "csv":
+        return Response(report)
+    resp = HttpResponse(content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="tutorbridge-pilot-report-{days}d-{timezone.localdate()}.csv"'
+    resp.write("﻿")
+    w = csv.writer(resp)
+    w.writerow(["Metric", "Value", "Unit", "Target", "On target", "Sample size", "Definition"])
+    for m in report["scorecard"]:
+        w.writerow([m["label"], "" if m["value"] is None else m["value"], m["unit"].strip(), m["target"],
+                    {True: "yes", False: "no", None: ""}[m["on_target"]], m["n"], m["hint"]])
+    w.writerow([])
+    w.writerow(["Week starting", "Requests", "Paid bookings", "Lessons delivered", "GMV (NGN)", "Fill rate %"])
+    for r in report["weekly"]:
+        w.writerow([r["week"], r["requests"], r["bookings"], r["lessons"], r["gmv_kobo"] / 100, "" if r["fill_rate"] is None else r["fill_rate"]])
+    audit(request.user, "export", "export", "pilot_report", request=request)
+    return resp
+
+
+@api_view(["GET"])
 @permission_classes([staff_perm("audit.view")])
 def system_health(request):
     from core.health import checks

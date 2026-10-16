@@ -176,6 +176,7 @@ api = [
     path("staff/areas/", bo.area_create),
     path("staff/audit/", bo.audit_log),
     path("staff/health/", bo.system_health),
+    path("staff/reports/", bo.pilot_reports),
     path("staff/promos/", bo.promos),
     path("staff/content/faqs/", website_staff.faqs),
     path("staff/content/faqs/<int:pk>/", website_staff.faq_detail),

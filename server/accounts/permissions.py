@@ -8,7 +8,7 @@ from accounts.models import Role
 
 ROLE_PERMISSIONS = {
     Role.VETTING: {"vetting.view", "vetting.review", "vetting.decide", "users.view"},
-    Role.OPS: {"requests.view", "requests.match", "bookings.view", "bookings.manage", "users.view", "messages.view", "content.manage"},
+    Role.OPS: {"requests.view", "requests.match", "bookings.view", "bookings.manage", "users.view", "messages.view", "content.manage", "reports.view"},
     Role.FINANCE: {
         "finance.view",
         "payouts.create",
@@ -17,6 +17,7 @@ ROLE_PERMISSIONS = {
         "users.view",
         "reports.export",
         "promos.manage",
+        "reports.view",
     },
     Role.SAFETY: {"safety.view", "safety.act", "disputes.view", "disputes.resolve", "users.view", "users.suspend", "messages.view"},
 }

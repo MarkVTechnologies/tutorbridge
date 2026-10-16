@@ -44,7 +44,7 @@ and sends a signed webhook to the server — the same path real Paystack payment
 ### Tests
 
 ```bash
-cd server && python manage.py test tests           # 200 tests: ledger, payments, bookings, policies, permissions
+cd server && python manage.py test tests           # 220+ tests: ledger, payments, bookings, policies, permissions
 python -m coverage run manage.py test tests && python -m coverage report   # ~92% on payments/bookings/accounts/trust
 cd client && npm run typecheck
 ```
@@ -75,13 +75,14 @@ tables and silently matches nothing. Use `core.dates.day_start()` / `day_range()
 | Trust (REV/SAF) | Reviews only after confirmed lessons, private tutor→parent ratings, moderation; disputes freezing payout with refund/partial/reject; urgent safety button alerting safety officers; suspend/ban with booking reassignment; strikes; reliability score and Verified/Gold/Elite tiers |
 | Admin (ADM) | KPI dashboard, settings for every fee/policy, rate bands, subjects/areas, user search + activity history, immutable audit log, CSV exports, FAQ and blog editor |
 | Phase 2 | Package auto-renewal with saved cards (BKG-06), promo codes and referral credits (PAY-10), private calendar feed (BKG-05), Sentry + daily health email + staff health panel |
+| Phase 3 (pilot) | Address autocomplete (Nominatim, or Google with `GOOGLE_MAPS_API_KEY`) with real-distance matching and check-in distance flags; interview confirmations + 24h/1h reminders (TUT-10); online lesson links limited to Meet/Zoom/Teams/Whereby with a Join button 15 min before (LSN-07); **Pilot reports** at `/staff/reports` — PRD §20 scorecard vs targets, weekly trends, parent cohort retention, fill rate by area, CSV (ADM-07) |
 | Website (WEB) | Home, how it works, safety, pricing, FAQ, contact, blog, legal drafts, tutor search + profiles, subject × area SEO pages, PWA manifest + service worker |
 
 ## Not done yet / needs a decision
 
 - **KYC provider** — adapter is in `server/vetting/kyc.py`; the default `manual` provider routes every NIN check to the vetting team until Prembly/Dojah/VerifyMe/Smile ID is chosen (PRD decision #5).
 - **Escrow structure** — the ledger holds funds per the PRD; confirm with a fintech lawyer whether gateway split/sub-accounts or a licensed escrow partner is required (decision #8).
-- **Not yet built**: Google sign-in, WhatsApp notifications, ClamAV scanning, withholding tax, cohort/retention reports. Legal pages are drafts.
+- **Not yet built**: Google sign-in, WhatsApp notifications, ClamAV scanning, withholding tax, NPS surveys (the one PRD §20 metric the reports can't compute yet). Legal pages are drafts.
 - Termii sender ID registration, SPF/DKIM/DMARC, and gateway live keys.
 
 ## Deploy on cPanel (PRD §17)
