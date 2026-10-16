@@ -44,7 +44,7 @@ and sends a signed webhook to the server — the same path real Paystack payment
 ### Tests
 
 ```bash
-cd server && python manage.py test tests           # 151 tests: ledger, payments, bookings, policies, permissions
+cd server && python manage.py test tests           # 200 tests: ledger, payments, bookings, policies, permissions
 python -m coverage run manage.py test tests && python -m coverage report   # ~92% on payments/bookings/accounts/trust
 cd client && npm run typecheck
 ```
@@ -73,14 +73,15 @@ tables and silently matches nothing. Use `core.dates.day_start()` / `day_range()
 | Payouts (OUT) | Earnings dashboard, weekly batch above threshold, maker-checker approval with fresh TOTP, transfers + webhook settlement, failed-transfer return and retry, 48h hold + OTP on bank change, monthly statement PDF |
 | Messaging (MSG) | Booking-gated threads, contact masking (numbers, emails, links, handles, spelled-out digits), repeat-attempt flagging, staff view of originals, email/SMS/in-app notifications with editable templates and preferences |
 | Trust (REV/SAF) | Reviews only after confirmed lessons, private tutor→parent ratings, moderation; disputes freezing payout with refund/partial/reject; urgent safety button alerting safety officers; suspend/ban with booking reassignment; strikes; reliability score and Verified/Gold/Elite tiers |
-| Admin (ADM) | KPI dashboard, settings for every fee/policy, rate bands, subjects/areas, user search + activity history, immutable audit log, CSV exports |
+| Admin (ADM) | KPI dashboard, settings for every fee/policy, rate bands, subjects/areas, user search + activity history, immutable audit log, CSV exports, FAQ and blog editor |
+| Phase 2 | Package auto-renewal with saved cards (BKG-06), promo codes and referral credits (PAY-10), private calendar feed (BKG-05), Sentry + daily health email + staff health panel |
 | Website (WEB) | Home, how it works, safety, pricing, FAQ, contact, blog, legal drafts, tutor search + profiles, subject × area SEO pages, PWA manifest + service worker |
 
 ## Not done yet / needs a decision
 
 - **KYC provider** — adapter is in `server/vetting/kyc.py`; the default `manual` provider routes every NIN check to the vetting team until Prembly/Dojah/VerifyMe/Smile ID is chosen (PRD decision #5).
 - **Escrow structure** — the ledger holds funds per the PRD; confirm with a fintech lawyer whether gateway split/sub-accounts or a licensed escrow partner is required (decision #8).
-- **Not yet built**: package auto-renewal charging (flag is stored), promo codes/referrals, iCal feed, Google sign-in, WhatsApp, Sentry wiring, ClamAV scanning, withholding tax. Legal pages are drafts.
+- **Not yet built**: Google sign-in, WhatsApp notifications, ClamAV scanning, withholding tax, cohort/retention reports. Legal pages are drafts.
 - Termii sender ID registration, SPF/DKIM/DMARC, and gateway live keys.
 
 ## Deploy on cPanel (PRD §17)
@@ -103,4 +104,4 @@ tables and silently matches nothing. Use `core.dates.day_start()` / `day_range()
    0 18 * * 4   … manage.py cron weekly    # prepare payout batch for Friday approval
    0 3 1 * *    … manage.py cron monthly   # re-verification and review reminders
    ```
-9. **Monitoring**: point UptimeRobot at `/api/health/` — it returns 503 if the job queue hasn't run in 10 minutes.
+9. **Monitoring**: point UptimeRobot at `/api/health/` — it returns 503 if the job queue hasn't run in 10 minutes. Set `SENTRY_DSN` for error tracking (no personal data is sent). Super admins get a daily health email after the 02:00 run, and the staff dashboard shows the same checks live.
