@@ -210,6 +210,9 @@ SMS_PROVIDER = env("SMS_PROVIDER", "console")  # termii | console
 TERMII_API_KEY = env("TERMII_API_KEY", "")
 TERMII_SENDER_ID = env("TERMII_SENDER_ID", "TutorBridge")
 KYC_PROVIDER = env("KYC_PROVIDER", "manual")  # manual | dojah | prembly ...
+GOOGLE_MAPS_API_KEY = env("GOOGLE_MAPS_API_KEY", "")  # optional; OpenStreetMap is used when empty
+GEO_PROVIDER = env("GEO_PROVIDER", "off" if TESTING else "nominatim")  # nominatim | off (google is chosen automatically by key)
+GEO_CONTACT_EMAIL = env("GEO_CONTACT_EMAIL", "hello@tutorbridge.ng")  # required by OpenStreetMap's usage policy
 SAFETY_OFFICER_PHONE = env("SAFETY_OFFICER_PHONE", "")
 SAFETY_OFFICER_EMAIL = env("SAFETY_OFFICER_EMAIL", "safety@tutorbridge.ng")
 

@@ -96,6 +96,9 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
             parent=parent, tutor=tutor, child=child, subjects=subjects, package_size=d["package_size"], lesson_minutes=d["lesson_minutes"],
             schedule=d["schedule"], start_date=d["start_date"], request=req, address=address, area=area, is_online=d["is_online"],
             promo_code=d.get("promo_code") or None,
+            # Exact lesson location, when the parent picked their address from search (used for distance and check-in checks).
+            lat=req.lat if req and req.lat is not None else (parent.lat if not req and address == parent.address else None),
+            lng=req.lng if req and req.lng is not None else (parent.lng if not req and address == parent.address else None),
         )
         balance = ledger.balance(ledger.wallet(parent))
         due = booking.total_kobo - balance

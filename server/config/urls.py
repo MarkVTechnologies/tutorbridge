@@ -62,6 +62,7 @@ api = [
     path("blog/", website.blog),
     path("blog/<slug:slug>/", website.blog_post),
     path("contact/", website.contact),
+    path("geo/search/", website.geo_search),
     path("seo/", website.seo_index),
     path("seo/<slug:subject_slug>/<slug:area_slug>/", website.seo_page),
     # Parent

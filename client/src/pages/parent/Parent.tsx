@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { CodeDisplay, DateChip, greeting, LessonRow, QuickAction, StatusStepper, WelcomeBanner } from "@/components/app";
+import { AddressSearch } from "@/components/AddressSearch";
 import { CalendarButton } from "@/components/CalendarButton";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Seo } from "@/components/Seo";
@@ -220,7 +221,7 @@ export function NewRequest() {
   const tutor = useApi<TutorPublic>(requestedTutor ? `/tutors/${requestedTutor}/` : null);
   const [f, setF] = useState({
     child: "", subjects: [] as number[], goals: "", schedule: [] as Slot[], lesson_minutes: 90, start_date: todayISO(3),
-    address: "", area: "", budget_max: "", gender: "", is_online: false,
+    address: "", area: "", budget_max: "", gender: "", is_online: false, lat: null as number | null, lng: null as number | null,
   });
   useEffect(() => {
     if (profile.data) setF((x) => ({ ...x, address: x.address || profile.data!.address || "", area: x.area || String(profile.data!.area ?? "") }));
@@ -230,7 +231,7 @@ export function NewRequest() {
   }, [children.data]);
   const submit = useAction(() => api.post<LessonRequest>("/requests/", {
     child: Number(f.child), subjects: f.subjects, goals: f.goals, schedule: f.schedule, lesson_minutes: f.lesson_minutes, start_date: f.start_date,
-    address: f.address, area: Number(f.area), budget_max_kobo: f.budget_max ? toKobo(f.budget_max) : 0, is_online: f.is_online,
+    address: f.address, area: Number(f.area), lat: f.is_online ? null : f.lat, lng: f.is_online ? null : f.lng, budget_max_kobo: f.budget_max ? toKobo(f.budget_max) : 0, is_online: f.is_online,
     preferences: f.gender ? { gender: f.gender } : {}, requested_tutor: requestedTutor ? Number(requestedTutor) : null,
   }), [["requests"]], { success: "Request submitted — we're matching tutors now" });
   const e = submit.error;
@@ -303,7 +304,13 @@ export function NewRequest() {
           <Select label="Area" required value={f.area} onChange={(ev) => setF({ ...f, area: ev.target.value })} error={e?.field("area")}>
             <option value="">Choose…</option>{ref?.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </Select>
-          {!f.is_online && <Input label="Lesson address" icon={MapPin} hint="Shared with the tutor only after they accept your booking." value={f.address} onChange={(ev) => setF({ ...f, address: ev.target.value })} error={e?.field("address")} />}
+          {!f.is_online && (
+            <AddressSearch label="Lesson address" hint="Pick your address from the list for the most accurate tutor matches. Shared with the tutor only after they accept."
+              value={f.address} error={e?.field("address")}
+              onChange={(address) => setF((x) => ({ ...x, address, lat: null, lng: null }))}
+              onPick={(p) => setF((x) => ({ ...x, lat: p.lat, lng: p.lng, area: p.area_id ? String(p.area_id) : x.area }))} />
+          )}
+          {!f.is_online && f.lat !== null && <p className="-mt-3 flex items-center gap-1.5 text-xs text-brand-700"><MapPin className="size-3.5" />Location found — we'll match tutors by real distance.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Maximum budget per hour (₦)" icon={Banknote} inputMode="numeric" placeholder="e.g. 8000" value={f.budget_max} onChange={(ev) => setF({ ...f, budget_max: ev.target.value })} />
             <Select label="Tutor gender preference" value={f.gender} onChange={(ev) => setF({ ...f, gender: ev.target.value })}>

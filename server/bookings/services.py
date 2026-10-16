@@ -114,7 +114,7 @@ def check_availability(tutor, schedule, lesson_minutes):
 
 @transaction.atomic
 def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minutes, schedule, start_date, request=None, address="", area=None,
-                   is_online=False, promo_code=None):
+                   is_online=False, promo_code=None, lat=None, lng=None):
     from tutors.models import TutorStatus
 
     tutor = lock_tutor_calendar(tutor)
@@ -144,7 +144,7 @@ def create_booking(*, parent, tutor, child, subjects, package_size, lesson_minut
         package_size=package_size, lesson_minutes=lesson_minutes, schedule=schedule, start_date=start_date,
         hourly_rate_kobo=q["hourly_rate_kobo"], lesson_price_kobo=q["lesson_price_kobo"], commission_pct=q["commission_pct"],
         matching_fee_kobo=q["matching_fee_kobo"], matching_credit_kobo=q["matching_credit_kobo"], total_kobo=q["total_kobo"],
-        promo=q["promo"], discount_kobo=q["discount_kobo"], address=address, area=area, is_online=is_online,
+        promo=q["promo"], discount_kobo=q["discount_kobo"], address=address, area=area, is_online=is_online, lat=lat, lng=lng,
     )
     booking.subjects.set(subjects)
     _create_lessons(booking, slots)
@@ -346,7 +346,7 @@ def replace_tutor(booking, new_tutor, by_user, reason=""):
         parent=booking.parent, tutor=new_tutor, child=booking.child, request=booking.request, is_trial=False,
         package_size=count, lesson_minutes=booking.lesson_minutes, schedule=booking.schedule, start_date=slots[0][0].date(),
         hourly_rate_kobo=new_tutor.hourly_rate_kobo, lesson_price_kobo=new_price, commission_pct=commission_for(new_tutor),
-        total_kobo=new_price * count, address=booking.address, area=booking.area, is_online=booking.is_online,
+        total_kobo=new_price * count, address=booking.address, area=booking.area, is_online=booking.is_online, lat=booking.lat, lng=booking.lng,
         replaces=booking, status=BookingStatus.OFFERED,
         offer_expires_at=timezone.now() + timedelta(hours=config.get("booking_accept_hours")),
     )
@@ -405,6 +405,11 @@ def _check_in(lesson, tutor, lat, lng):
     lesson.late_minutes = max(0, int((now - lesson.scheduled_start).total_seconds() // 60))
     if lat is not None and lng is not None and tutor.location_consent:
         lesson.checkin_lat, lesson.checkin_lng = round(Decimal(str(lat)), 6), round(Decimal(str(lng)), 6)
+        b = lesson.booking
+        if b.lat is not None and b.lng is not None:
+            from core.geo import haversine_km
+
+            lesson.checkin_distance_m = round(haversine_km(b.lat, b.lng, lesson.checkin_lat, lesson.checkin_lng) * 1000)
     lesson.code_attempts = 0
     lesson.save()
     notify(lesson.booking.parent.user, "tutor_checked_in", {"tutor_name": tutor.user.display_name, "time": timezone.localtime(now).strftime("%H:%M")})
@@ -664,7 +669,7 @@ def renew_package(booking):
         new = create_booking(
             parent=parent, tutor=booking.tutor, child=booking.child, subjects=list(booking.subjects.all()),
             package_size=booking.package_size, lesson_minutes=booking.lesson_minutes, schedule=booking.schedule, start_date=start,
-            address=booking.address, area=booking.area, is_online=booking.is_online,
+            address=booking.address, area=booking.area, is_online=booking.is_online, lat=booking.lat, lng=booking.lng,
         )
     except ValidationError as e:
         booking.auto_renew = False

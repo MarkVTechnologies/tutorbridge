@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { KeyValue } from "@/components/shared";
 import { Alert, Badge, Button, Card, ErrorAlert, Input, Loading, Modal, PageHeader, Select, StatusBadge, Table, Td, Textarea } from "@/components/ui";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { hasPerm, useAuth } from "@/lib/auth";
 import { dateOnly, dateTime, naira, relative, schedule as fmtSchedule } from "@/lib/format";
 import { useAction, useApi } from "@/lib/hooks";
@@ -153,7 +154,7 @@ export function StaffBookings() {
 type BDetail = {
   id: number; status: string; parent: { id: number; name: string; email: string; phone: string }; tutor: { id: number; name: string; email: string; phone: string; tutor_id: number };
   child: string; subjects: string[]; package_size: number; lesson_minutes: number; schedule: Slot[]; total_kobo: number; commission_pct: string; escrow_balance_kobo: number;
-  address: string; request: number | null; declined_tutor_ids: number[]; replaces: number | null; lessons: (Lesson & { checkin_lat: string | null; checkin_lng: string | null })[];
+  address: string; request: number | null; declined_tutor_ids: number[]; replaces: number | null; lessons: (Lesson & { checkin_lat: string | null; checkin_lng: string | null; checkin_distance_m: number | null })[];
 };
 
 export function StaffBookingDetail() {
@@ -192,7 +193,12 @@ export function StaffBookingDetail() {
           {b.lessons.map((l) => (
             <tr key={l.id}>
               <Td>{dateTime(l.scheduled_start)}</Td><Td><StatusBadge status={l.status} /></Td><Td><StatusBadge status={l.escrow_status} /></Td>
-              <Td className="text-xs">{dateTime(l.checkin_at)}{l.late_minutes > 0 && ` (+${l.late_minutes}m)`}{l.checkin_lat && <a className="block text-brand-700" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${l.checkin_lat}&mlon=${l.checkin_lng}#map=17/${l.checkin_lat}/${l.checkin_lng}`}>location</a>}</Td>
+              <Td className="text-xs">{dateTime(l.checkin_at)}{l.late_minutes > 0 && ` (+${l.late_minutes}m)`}{l.checkin_lat && <a className="block text-brand-700" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${l.checkin_lat}&mlon=${l.checkin_lng}#map=17/${l.checkin_lat}/${l.checkin_lng}`}>location</a>}
+                {l.checkin_distance_m != null && (
+                  <span className={cn("mt-0.5 block font-semibold", l.checkin_distance_m > 300 ? "text-red-600" : "text-brand-700")}>
+                    {l.checkin_distance_m < 1000 ? `${l.checkin_distance_m} m` : `${(l.checkin_distance_m / 1000).toFixed(1)} km`} from address{l.checkin_distance_m > 300 ? " ⚠" : ""}
+                  </span>
+                )}</Td>
               <Td className="text-xs">{dateTime(l.checkout_at)}</Td>
               <Td className="max-w-xs text-xs">{l.note_topics}</Td>
               <Td>{canManage && l.status === "scheduled" && new Date(l.scheduled_start) < new Date() && <Button variant="ghost" className="text-red-700" onClick={() => noShow.mutate(l.id)}>Mark no-show</Button>}</Td>

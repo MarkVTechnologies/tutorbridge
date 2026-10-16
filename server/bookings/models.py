@@ -37,6 +37,8 @@ class Booking(models.Model):
     # Location snapshot
     address = EncryptedTextField(blank=True)
     area = models.ForeignKey("core.Area", null=True, blank=True, on_delete=models.PROTECT)
+    lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # lesson address, for check-in distance
+    lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     is_online = models.BooleanField(default=False)
     online_link = models.URLField(blank=True)  # LSN-07
     # Lifecycle
@@ -99,6 +101,7 @@ class Lesson(models.Model):
     checkin_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     checkin_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     late_minutes = models.PositiveSmallIntegerField(default=0)
+    checkin_distance_m = models.PositiveIntegerField(null=True, blank=True)  # from the booked address, if both known
     # LSN-03 lesson note
     note_topics = models.TextField(blank=True)
     note_homework = models.TextField(blank=True)

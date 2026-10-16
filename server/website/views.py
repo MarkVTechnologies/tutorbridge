@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core import config
 from core.models import LGA, Area, Curriculum, Level, State, Subject
@@ -96,3 +96,21 @@ def seo_index(request):
         {"subject": r["subjects__subject__slug"], "subject_name": r["subjects__subject__name"], "area": r["areas__area__slug"], "area_name": r["areas__area__name"]}
         for r in rows if r["subjects__subject__slug"] and r["areas__area__slug"]
     ])
+
+
+class GeoThrottle(UserRateThrottle):
+    rate = "30/min"
+
+
+@api_view(["GET"])
+@throttle_classes([GeoThrottle])
+def geo_search(request):
+    """Address autocomplete for signed-in users. Each result includes the nearest TutorBridge neighbourhood, if any."""
+    from core.geo import nearest_area, search
+
+    results = []
+    for r in search(request.query_params.get("q", "")):
+        area = nearest_area(r["lat"], r["lng"])
+        results.append({**r, "area_id": area.pk if area else None, "area_name": area.name if area else None})
+    return Response(results)
+

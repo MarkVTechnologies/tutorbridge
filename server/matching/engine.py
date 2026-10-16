@@ -44,8 +44,11 @@ def availability_overlap(tutor, schedule, lesson_minutes):
 
 
 def distance_km(tutor, request):
+    """Straight-line km from the lesson address (or its neighbourhood centre) to the tutor's home (or their area's centre)."""
     lat = request.lat if request.lat is not None else request.area.lat
     lng = request.lng if request.lng is not None else request.area.lng
+    if tutor.home_lat is not None and tutor.home_lng is not None:
+        return haversine_km(lat, lng, tutor.home_lat, tutor.home_lng)
     home = tutor.home_area
     if home is None:
         return None

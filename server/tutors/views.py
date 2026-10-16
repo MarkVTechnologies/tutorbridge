@@ -91,7 +91,9 @@ def set_areas(request):
             tutor.home_area = get_object_or_404(Area, pk=request.data["home_area"])
         if request.data.get("max_travel_km"):
             tutor.max_travel_km = max(1, min(50, int(request.data["max_travel_km"])))
-        tutor.save(update_fields=["home_area", "max_travel_km"])
+        if "home_lat" in request.data:  # precise home point from address search (private)
+            tutor.home_lat, tutor.home_lng = request.data.get("home_lat"), request.data.get("home_lng")
+        tutor.save(update_fields=["home_area", "max_travel_km", "home_lat", "home_lng"])
         TutorArea.objects.filter(tutor=tutor).exclude(area_id__in=area_ids).delete()
         for aid in area_ids:
             TutorArea.objects.get_or_create(tutor=tutor, area_id=aid)

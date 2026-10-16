@@ -32,6 +32,9 @@ class TutorProfile(models.Model):
     hourly_rate_kobo = models.BigIntegerField(default=0)
     home_area = models.ForeignKey("core.Area", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     max_travel_km = models.PositiveSmallIntegerField(default=10)
+    # Optional precise home location (private; used only for distance). Falls back to home_area's centre.
+    home_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    home_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     accepts_special_needs = models.BooleanField(default=False)
     offers_online = models.BooleanField(default=False)
     # Reputation (computed by nightly job)

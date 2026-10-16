@@ -82,7 +82,7 @@ class TutorOwnProfileSerializer(serializers.ModelSerializer):
         model = TutorProfile
         fields = [
             "id", "status", "status_display", "headline", "bio", "photo", "photo_url", "highest_qualification", "years_experience",
-            "trcn_number", "curricula", "hourly_rate_kobo", "home_area", "max_travel_km", "accepts_special_needs", "offers_online",
+            "trcn_number", "curricula", "hourly_rate_kobo", "home_area", "home_lat", "home_lng", "max_travel_km", "accepts_special_needs", "offers_online",
             "subjects", "availability", "areas", "tier", "rating_avg", "rating_count", "reliability_score", "hours_taught",
             "lessons_completed", "strikes", "safeguarding_completed_at", "agreement_signed_at", "location_consent",
             "submitted_at", "approved_at", "background_valid_until", "reverify_due",

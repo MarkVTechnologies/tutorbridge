@@ -439,7 +439,7 @@ def _booking_json(request, pk):
         "child": b.child.first_name, "subjects": [s.name for s in b.subjects.all()], "package_size": b.package_size, "lesson_minutes": b.lesson_minutes,
         "schedule": b.schedule, "total_kobo": b.total_kobo, "commission_pct": str(b.commission_pct), "escrow_balance_kobo": ledger.balance(ledger.escrow(b)),
         "address": b.address, "request": b.request_id, "declined_tutor_ids": b.declined_tutor_ids, "replaces": b.replaces_id,
-        "lessons": [{**LessonSerializer(l, context={"request": request}).data, "checkin_lat": l.checkin_lat, "checkin_lng": l.checkin_lng} for l in lessons],
+        "lessons": [{**LessonSerializer(l, context={"request": request}).data, "checkin_lat": l.checkin_lat, "checkin_lng": l.checkin_lng, "checkin_distance_m": l.checkin_distance_m} for l in lessons],
     }
 
 

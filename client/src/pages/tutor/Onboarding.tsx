@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Seo } from "@/components/Seo";
+import { AddressSearch } from "@/components/AddressSearch";
 import { FileUpload } from "@/components/shared";
 import { Alert, Badge, Button, Card, Checkbox, ErrorAlert, Input, Loading, PageHeader, Select, StatusBadge, Textarea, cx } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -16,7 +17,7 @@ import type { TutorSubject } from "@/lib/types";
 type Step = { key: string; label: string; done: boolean };
 type Profile = {
   status: string; headline: string; bio: string; photo_url: string | null; highest_qualification: string; years_experience: number; trcn_number: string;
-  curricula: number[]; hourly_rate_kobo: number; home_area: number | null; max_travel_km: number; accepts_special_needs: boolean; offers_online: boolean;
+  curricula: number[]; hourly_rate_kobo: number; home_area: number | null; home_lat: string | null; home_lng: string | null; max_travel_km: number; accepts_special_needs: boolean; offers_online: boolean;
   subjects: TutorSubject[]; availability: { weekday: number; start_time: string; end_time: string }[]; areas: { id: number; name: string }[];
   progress: { steps: Step[]; completed: number; total: number; can_submit: boolean; police_certificate_uploaded: boolean };
   rate_band: { min_kobo: number; max_kobo: number } | null; location_consent: boolean;
@@ -195,7 +196,11 @@ function AreasStep({ p, onDone }: { p: Profile; onDone: () => void }) {
   const [home, setHome] = useState(p.home_area ?? "");
   const [areas, setAreas] = useState<number[]>(p.areas.map((a) => a.id));
   const [km, setKm] = useState(p.max_travel_km);
-  const save = useAction(() => api.put("/tutor/profile/areas/", { home_area: Number(home), areas, max_travel_km: km }), [PROFILE_KEY]);
+  const [homeAddress, setHomeAddress] = useState("");
+  const [homePoint, setHomePoint] = useState<{ lat: number; lng: number } | null>(null);
+  const save = useAction(() => api.put("/tutor/profile/areas/", {
+    home_area: Number(home), areas, max_travel_km: km, ...(homePoint ? { home_lat: homePoint.lat, home_lng: homePoint.lng } : {}),
+  }), [PROFILE_KEY], { success: "Areas saved" });
   const byLga = useMemo(() => ref?.lgas.map((l) => ({ lga: l, areas: ref.areas.filter((a) => a.lga_id === l.id) })).filter((g) => g.areas.length) ?? [], [ref]);
   return (
     <Card title="Areas you serve">
@@ -203,6 +208,10 @@ function AreasStep({ p, onDone }: { p: Profile; onDone: () => void }) {
         <Select label="Where do you live? (neighbourhood)" value={home} onChange={(e) => setHome(e.target.value)} hint="Used to calculate travel distance. Never shown in full.">
           <option value="">Choose…</option>{ref?.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </Select>
+        <AddressSearch label="Your home address (optional, private)" value={homeAddress}
+          hint={p.home_lat ? "A precise home location is saved. Search again to change it." : "Never shown to anyone. Lets us match you with families by real travel distance instead of neighbourhood."}
+          onChange={(v) => { setHomeAddress(v); setHomePoint(null); }}
+          onPick={(pl) => { setHomePoint({ lat: pl.lat, lng: pl.lng }); if (pl.area_id) setHome(pl.area_id); }} />
         <Input label="Maximum travel distance (km)" type="number" min={1} max={50} value={km} onChange={(e) => setKm(Number(e.target.value))} />
         {byLga.map(({ lga, areas: list }) => (
           <fieldset key={lga.id}>
