@@ -1,10 +1,14 @@
 """
-Local demo accounts and data. Refuses to run unless DEBUG is on.
+Demo accounts and data. Refuses to run unless DEBUG or DEMO_MODE is on.
+
+With DEMO_STAFF_TOTP_SECRET set (public demo), every staff account gets that 2FA
+secret pre-enrolled so demo visitors can add it to an authenticator app.
 
 Creates staff (one per role), a verified parent with a child, and three
 fully-vetted Active tutors in Lekki/Ajah/Yaba so matching and booking can be
 tried end to end.
 """
+import os
 from datetime import date, time, timedelta
 
 from django.conf import settings
@@ -40,17 +44,20 @@ TUTORS = [
 
 
 class Command(BaseCommand):
-    help = "Create demo accounts (DEBUG only)"
+    help = "Create demo accounts (DEBUG or DEMO_MODE only)"
 
     def handle(self, **opts):
-        if not settings.DEBUG:
-            raise CommandError("seed_demo only runs with DJANGO_DEBUG=1")
+        if not (settings.DEBUG or settings.DEMO_MODE):
+            raise CommandError("seed_demo only runs with DJANGO_DEBUG=1 or DEMO_MODE=1")
         call_command("seed_reference")
         now = timezone.now()
         for email, phone, first, last, role in STAFF:
             if not User.objects.filter(email=email).exists():
                 User.objects.create_user(email=email, phone=phone, password=PASSWORD, first_name=first, last_name=last, role=role,
                                          email_verified_at=now, phone_verified_at=now)
+        totp_secret = os.environ.get("DEMO_STAFF_TOTP_SECRET", "")
+        if totp_secret:
+            User.objects.filter(email__in=[s[0] for s in STAFF]).update(totp_secret=totp_secret, totp_enabled=True)
 
         if not User.objects.filter(email="parent@tutorbridge.test").exists():
             u = User.objects.create_user(email="parent@tutorbridge.test", phone="+2348200000001", password=PASSWORD, first_name="Adaeze",

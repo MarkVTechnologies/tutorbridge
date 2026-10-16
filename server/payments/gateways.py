@@ -1,7 +1,7 @@
 """
 Payment gateway adapters (PAY-01). Paystack is primary; Flutterwave is a
 switchable fallback (admin setting `active_gateway`). The "fake" gateway is
-for local development only and is refused when DEBUG is off.
+for local development and the public demo only; refused unless DEBUG or DEMO_MODE is on.
 
 Each adapter exposes the same interface and normalises webhooks to:
     {"event": "charge.success" | "transfer.success" | "transfer.failed", "reference": str, "id": str}
@@ -201,8 +201,8 @@ class FakeGateway:
     name = "fake"
 
     def __init__(self):
-        if not settings.DEBUG:
-            raise GatewayError("Fake gateway is disabled outside DEBUG")
+        if not (settings.DEBUG or settings.DEMO_MODE):
+            raise GatewayError("Fake gateway is disabled outside DEBUG/DEMO_MODE")
 
     def initialize(self, *, email, amount_kobo, reference, callback_url, metadata=None):
         return f"{settings.SITE_URL}/dev/fake-checkout?reference={reference}&amount={amount_kobo}"

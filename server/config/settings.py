@@ -201,7 +201,9 @@ CACHES = {
 FIELD_ENCRYPTION_KEYS = env_list("FIELD_ENCRYPTION_KEYS", "")
 
 # --- Integrations ---------------------------------------------------------
-PAYMENT_GATEWAY = env("PAYMENT_GATEWAY", "paystack")  # paystack | flutterwave | fake (dev only)
+# Public demo deployments: allows seed_demo and the simulated "fake" gateway without turning DEBUG on.
+DEMO_MODE = env_bool("DEMO_MODE", False)
+PAYMENT_GATEWAY = env("PAYMENT_GATEWAY", "paystack")  # paystack | flutterwave | fake (dev/demo only)
 PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", "")
 PAYSTACK_PUBLIC_KEY = env("PAYSTACK_PUBLIC_KEY", "")
 FLUTTERWAVE_SECRET_KEY = env("FLUTTERWAVE_SECRET_KEY", "")

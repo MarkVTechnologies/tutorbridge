@@ -77,7 +77,7 @@ def webhook(request, gateway):
     """Gateway webhooks: raw body + signature check; always 200 on valid-but-ignored events so the gateway stops retrying."""
     if request.method != "POST":
         return HttpResponse(status=405)
-    if gateway not in GATEWAYS or (gateway == "fake" and not settings.DEBUG):
+    if gateway not in GATEWAYS or (gateway == "fake" and not (settings.DEBUG or settings.DEMO_MODE)):
         return HttpResponse(status=404)
     try:
         ok = services.handle_webhook(gateway, request.body, request.headers)
@@ -91,8 +91,8 @@ def webhook(request, gateway):
 @api_view(["POST"])
 @permission_classes([IsParent])
 def fake_complete(request):
-    """DEBUG only: simulate the gateway confirming a payment by sending ourselves a signed webhook."""
-    if not settings.DEBUG or settings.PAYMENT_GATEWAY != "fake":
+    """DEBUG/DEMO_MODE only: simulate the gateway confirming a payment by sending ourselves a signed webhook."""
+    if not (settings.DEBUG or settings.DEMO_MODE) or settings.PAYMENT_GATEWAY != "fake":
         return Response(status=404)
     p = get_object_or_404(Payment, reference=request.data.get("reference"), parent__user=request.user, gateway="fake")
     p.raw_verification = {**(p.raw_verification or {}), "fake_paid": True}
