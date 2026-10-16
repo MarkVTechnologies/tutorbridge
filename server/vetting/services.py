@@ -132,3 +132,46 @@ def decide_check(tutor, check_type, status, staff, notes="", extra=None, request
     if check_type == CheckType.BACKGROUND:
         maybe_activate(tutor, staff)
     return c
+
+
+# --- Interview notifications (TUT-10) --------------------------------------
+
+
+def _interview_ctx(slot):
+    return {
+        "when": timezone.localtime(slot.starts_at).strftime("%a %d %b, %H:%M"),
+        "minutes": slot.duration_minutes,
+        "link": slot.meeting_link or "We'll email you the meeting link before the interview.",
+    }
+
+
+def interview_booked(slot):
+    from messaging.notify import notify
+
+    ctx = _interview_ctx(slot)
+    notify(slot.tutor.user, "interview_booked", ctx, link="/tutor/onboarding?step=interview")
+    notify(slot.officer, "interview_booked_officer", {**ctx, "tutor_name": slot.tutor.user.get_full_name()}, link=f"/staff/vetting/{slot.tutor_id}",
+           force_channels=("inapp",))
+
+
+def send_interview_reminders():
+    """Run every 5 minutes: remind tutors 24 hours and 1 hour before their interview (once each)."""
+    from messaging.notify import notify
+
+    from vetting.models import InterviewSlot
+
+    now = timezone.now()
+    upcoming = InterviewSlot.objects.filter(tutor__isnull=False, outcome="", starts_at__gt=now).select_related("tutor__user")
+    sent = 0
+    for slot in upcoming.filter(starts_at__lte=now + timedelta(hours=1), reminded_1h=False):
+        notify(slot.tutor.user, "interview_soon", _interview_ctx(slot), link="/tutor/onboarding?step=interview")
+        slot.reminded_1h = slot.reminded_24h = True
+        slot.save(update_fields=["reminded_1h", "reminded_24h"])
+        sent += 1
+    for slot in upcoming.filter(starts_at__lte=now + timedelta(hours=24), reminded_24h=False):
+        notify(slot.tutor.user, "interview_reminder", _interview_ctx(slot), link="/tutor/onboarding?step=interview")
+        slot.reminded_24h = True
+        slot.save(update_fields=["reminded_24h"])
+        sent += 1
+    return sent
+

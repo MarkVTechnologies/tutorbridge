@@ -118,6 +118,8 @@ class InterviewSlot(models.Model):
     tutor = models.ForeignKey("tutors.TutorProfile", null=True, blank=True, on_delete=models.SET_NULL, related_name="interviews")
     outcome = models.CharField(max_length=10, blank=True, choices=[("pass", "Pass"), ("fail", "Fail"), ("no_show", "No-show")])
     notes = models.TextField(blank=True)
+    reminded_24h = models.BooleanField(default=False)  # TUT-10
+    reminded_1h = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["starts_at"]

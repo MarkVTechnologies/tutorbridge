@@ -165,6 +165,7 @@ def book_interview(request, pk):
         c = check(tutor, CheckType.INTERVIEW)
         c.status = CheckStatus.SUBMITTED
         c.save(update_fields=["status"])
+    services.interview_booked(InterviewSlot.objects.select_related("officer").get(pk=pk))
     return Response({"detail": "Interview booked."})
 
 

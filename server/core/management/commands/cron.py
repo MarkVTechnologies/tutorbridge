@@ -34,6 +34,9 @@ def five():
     b.expire_unpaid()
     b.send_reminders()
     b.detect_late_and_no_shows()
+    from vetting.services import send_interview_reminders
+
+    send_interview_reminders()
     _request_sla_alerts()
 
 
