@@ -89,7 +89,8 @@ def verify_and_credit(payment, source="webhook"):
     """Server-side verify call; only a verified, matching success credits the wallet."""
     if payment.status == Payment.Status.SUCCESS:
         return payment
-    v = get_gateway(payment.gateway).verify(payment.reference)
+    gateway = get_gateway(payment.gateway)
+    v = gateway.verify(payment.reference)
     with transaction.atomic():
         payment = Payment.objects.select_for_update().get(pk=payment.pk)
         if payment.status == Payment.Status.SUCCESS:
@@ -109,9 +110,55 @@ def verify_and_credit(payment, source="webhook"):
         payment.status, payment.verified_at = Payment.Status.SUCCESS, timezone.now()
         payment.fee_kobo, payment.channel = v.fee_kobo, v.channel
         payment.save()
+        if not payment.saved_card_id:
+            remember_card(payment.parent, gateway, v.raw)
         credit_payment(payment)
     notify(payment.parent.user, "payment_received", {"amount": naira(payment.amount_kobo), "reference": payment.reference})
     return payment
+
+
+def remember_card(parent, gateway, raw):
+    """Keep the gateway's reusable card token (never the card number) for auto-renewals; one row per physical card."""
+    from payments.models import SavedCard
+
+    info = gateway.saved_card(raw) if hasattr(gateway, "saved_card") else None
+    if info is None:
+        return None
+    existing = SavedCard.objects.filter(parent=parent, gateway=gateway.name, is_active=True)
+    match = existing.filter(signature=info.signature).first() if info.signature else None
+    match = match or existing.filter(last4=info.last4, exp_month=info.exp_month, exp_year=info.exp_year).first()
+    fields = {"authorization_code": info.authorization_code, "signature": info.signature, "brand": info.brand, "last4": info.last4,
+              "exp_month": info.exp_month, "exp_year": info.exp_year, "email": info.email or parent.user.email}
+    if match:
+        for k, v in fields.items():
+            setattr(match, k, v)
+        match.save()
+        return match
+    return SavedCard.objects.create(parent=parent, gateway=gateway.name, **fields)
+
+
+def charge_saved_card(parent, card, amount_kobo, booking=None):
+    """
+    Charge a saved card (auto-renewal). The wallet is credited only after the server-side verify call
+    confirms the charge — exactly as for a normal checkout; the webhook path stays idempotent with this.
+    Returns the Payment; its status tells the caller whether money arrived.
+    """
+    gateway = get_gateway(card.gateway)
+    payment = Payment.objects.create(parent=parent, booking=booking, gateway=gateway.name, reference=new_reference("TBR"),
+                                     amount_kobo=amount_kobo, saved_card=card)
+    try:
+        status = gateway.charge_authorization(email=card.email or parent.user.email, amount_kobo=amount_kobo,
+                                              authorization_code=card.authorization_code, reference=payment.reference,
+                                              metadata={"payment_id": payment.pk, "booking_id": booking.pk if booking else None, "renewal": True})
+    except GatewayError as e:
+        payment.status, payment.raw_verification = Payment.Status.FAILED, {"charge_error": str(e)[:500]}
+        payment.save(update_fields=["status", "raw_verification"])
+        return payment
+    if status == "failed":
+        payment.status = Payment.Status.FAILED
+        payment.save(update_fields=["status"])
+        return payment
+    return verify_and_credit(payment, source="saved_card")
 
 
 def credit_payment(payment):

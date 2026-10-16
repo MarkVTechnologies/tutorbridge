@@ -17,6 +17,8 @@ DEFAULTS = {
     "package_sizes": [1, 4, 8, 12, 24],
     "lesson_durations_minutes": [60, 90, 120],
     "booking_accept_hours": 12,  # BKG-03
+    "renewal_trigger_lessons_left": 1,  # BKG-06: renew when this many lessons remain
+    "renewal_payment_hours": 48,  # how long an unpaid renewal holds the tutor's slots
     "travel_buffer_minutes": 30,  # BKG-02
     # Lessons & disputes (section 4.4)
     "dispute_window_hours": 48,

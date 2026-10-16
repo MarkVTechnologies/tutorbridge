@@ -163,9 +163,21 @@ export interface Booking {
   next_lesson: string | null;
   lessons_done: number;
   thread_id: number | null;
+  renews: number | null;
+  renewed_by: number | null;
+  amount_due_kobo: number;
   created_at: string;
   lessons?: Lesson[];
   parent_summary?: { rating_avg: number | null; rating_count: number; cancellations: number };
+}
+
+export interface SavedCard { id: number; brand: string; last4: string; exp_month: string; exp_year: string; added: string }
+
+export interface WalletData {
+  balance_kobo: number;
+  in_escrow_kobo: number;
+  entries: { date: string; description: string; kind: string; amount_kobo: number }[];
+  saved_cards: SavedCard[];
 }
 
 export interface Notification { id: number; event: string; subject: string; body: string; link: string; read: boolean; created_at: string }

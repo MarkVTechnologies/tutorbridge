@@ -1,6 +1,6 @@
 import {
   ArrowRight, Baby, CalendarDays, CalendarPlus, Download, GraduationCap, MapPin, MessageSquare, Pencil, Plus, Receipt, RefreshCw, Search, Sparkles,
-  Star, UserRoundPlus, Wallet as WalletIcon, Clock, Target, Banknote, Globe,
+  Star, UserRoundPlus, Wallet as WalletIcon, Clock, Target, Banknote, Globe, CreditCard,
 } from "lucide-react";
 import { motion } from "@/lib/motion";
 import { useEffect, useMemo, useState } from "react";
@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { dateOnly, dateTime, naira, schedule as fmtSchedule, timeOnly, toKobo, todayISO } from "@/lib/format";
 import { useAction, useApi, useRefData } from "@/lib/hooks";
-import type { Booking, Child, Lesson, LessonRequest, Slot, TutorPublic } from "@/lib/types";
+import type { Booking, Child, Lesson, LessonRequest, Slot, TutorPublic, WalletData } from "@/lib/types";
 
 import { LessonActions } from "./LessonActions";
 
@@ -467,7 +467,10 @@ export function ParentBookingDetail() {
   const [replace, setReplace] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const cancel = useAction(() => api.post(`/bookings/${id}/cancel/`, { reason: "Cancelled by parent" }), [key, ["wallet"]], { success: "Booking cancelled — payment returned to your wallet" });
-  const renew = useAction((v: boolean) => api.patch(`/bookings/${id}/auto-renew/`, { auto_renew: v }), [key]);
+  const renew = useAction((v: boolean) => api.patch(`/bookings/${id}/auto-renew/`, { auto_renew: v }), [key], { success: "Auto-renewal updated" });
+  const payNow = useAction(() => api.post<{ payment: { authorization_url: string } | null }>(`/bookings/${id}/pay/`), [key, ["wallet"]]);
+  const walletInfo = useApi<WalletData>("/wallet/", ["wallet"]);
+  const card = walletInfo.data?.saved_cards[0];
   if (isLoading) return <Loading />;
   if (!b) return null;
   const month = todayISO().slice(0, 7);
@@ -484,7 +487,17 @@ export function ParentBookingDetail() {
       <div className="mb-6 space-y-3">
         {b.status === "offered" && <Alert tone="amber" title="Waiting for the tutor">{b.tutor_name} has until {dateTime(b.offer_expires_at)} to accept. If they don't, we'll offer your booking to the next tutor on your shortlist.</Alert>}
         {b.status === "reassigning" && <Alert tone="amber" title="Finding you another tutor">Your payment stays safely held — our team will contact you shortly.</Alert>}
-        {b.status === "awaiting_payment" && <Alert tone="amber">This booking hasn't been paid yet. It will be released if payment isn't completed within 2 hours.</Alert>}
+        {b.status === "awaiting_payment" && (
+          <Alert tone="amber" title={b.renews ? "Your renewal is waiting for payment" : "This booking hasn't been paid yet"}>
+            <p>{b.renews ? "We're holding the same tutor and time slots for you for 48 hours." : "It will be released if payment isn't completed within 2 hours."}</p>
+            <Button className="mt-3" icon={WalletIcon} loading={payNow.isPending} onClick={() => payNow.mutate(undefined, {
+              onSuccess: (r) => { if (r.payment) window.location.href = r.payment.authorization_url; },
+            })}>Pay {naira(b.amount_due_kobo)}</Button>
+            <ErrorAlert error={payNow.error} />
+          </Alert>
+        )}
+        {b.renews && <Alert tone="blue">This package continues <Link className="font-semibold underline" to={`/parent/bookings/${b.renews}`}>your previous package</Link> with {b.tutor_name}.</Alert>}
+        {b.renewed_by && <Alert tone="green">This package has been renewed. <Link className="font-semibold underline" to={`/parent/bookings/${b.renewed_by}`}>See the next package →</Link></Alert>}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <Card title="Lessons" icon={CalendarDays} className="self-start">
@@ -533,7 +546,14 @@ export function ParentBookingDetail() {
           </Card>
           <Card>
             <div className="space-y-3">
-              {b.status === "active" && !b.is_trial && <Checkbox label="Renew this package automatically each month" checked={b.auto_renew} onChange={(e) => renew.mutate(e.target.checked)} />}
+              {b.status === "active" && !b.is_trial && !b.renewed_by && (
+                <div className="rounded-2xl bg-ink-50/70 p-3">
+                  <Checkbox label="Renew this package automatically" checked={b.auto_renew} onChange={(e) => renew.mutate(e.target.checked)} />
+                  <p className="mt-1.5 pl-8 text-xs leading-relaxed text-ink-500">
+                    {b.auto_renew ? "Before the last lesson, we'll book the same slots again" : "Keep the same tutor and time slots"} — paid from your wallet first{card ? `, then your ${card.brand || "card"} ending ${card.last4}` : ""}. You can turn this off any time.
+                  </p>
+                </div>
+              )}
               {b.status === "active" && <Button variant="secondary" className="w-full" icon={RefreshCw} onClick={() => setReplace(true)}>Request a different tutor</Button>}
               {["awaiting_payment", "offered", "reassigning"].includes(b.status) && <Button variant="danger" className="w-full" onClick={() => setConfirmCancel(true)}>Cancel booking</Button>}
               <p className="text-xs leading-relaxed text-ink-500">Replacements are free and your remaining balance moves with you.</p>
@@ -580,7 +600,8 @@ function ReplaceModal({ bookingId, onClose }: { bookingId: number; onClose: () =
 // --- Wallet ---------------------------------------------------------------
 
 export function Wallet() {
-  const wallet = useApi<{ balance_kobo: number; in_escrow_kobo: number; entries: { date: string; description: string; kind: string; amount_kobo: number }[] }>("/wallet/", ["wallet"]);
+  const wallet = useApi<WalletData>("/wallet/", ["wallet"]);
+  const removeCard = useAction((cardId: number) => api.del(`/saved-cards/${cardId}/`), [["wallet"]], { success: "Card removed" });
   const payments = useApi<{ reference: string; amount_kobo: number; status: string; channel: string; created_at: string; booking: number | null }[]>("/payments/", ["payments"]);
   const [amount, setAmount] = useState("");
   const topup = useAction(() => api.post<{ authorization_url: string }>("/payments/topup/", { amount_kobo: toKobo(amount) }));
@@ -616,6 +637,23 @@ export function Wallet() {
           </form>
         </Card>
       </div>
+      <Card className="mt-5" title="Saved cards" icon={CreditCard} subtitle="Used only for package auto-renewals you've switched on. We store a secure token from Paystack — never your card number.">
+        {!wallet.data?.saved_cards.length ? (
+          <p className="text-sm text-ink-500">No saved cards. A card is saved automatically when you pay by card, and you can remove it here at any time.</p>
+        ) : (
+          <ul className="divide-y divide-ink-100">
+            {wallet.data.saved_cards.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="flex items-center gap-3">
+                  <span className="flex h-9 w-14 items-center justify-center rounded-lg bg-gradient-to-br from-ink-800 to-ink-950 text-[10px] font-bold tracking-wider text-white uppercase">{c.brand || "Card"}</span>
+                  <span><span className="font-semibold text-ink-900">•••• {c.last4}</span><span className="block text-xs text-ink-500">Expires {c.exp_month}/{c.exp_year.slice(-2)}</span></span>
+                </span>
+                <Button size="sm" variant="ghost" className="text-red-600" loading={removeCard.isPending} onClick={() => removeCard.mutate(c.id)}>Remove</Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 font-display text-lg font-semibold">Payments</h2>

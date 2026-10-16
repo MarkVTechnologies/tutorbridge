@@ -66,6 +66,28 @@ class LedgerEntry(AppendOnlyModel):
         ]
 
 
+class SavedCard(models.Model):
+    """
+    Reusable card token from a successful card checkout, used for package auto-renewal (BKG-06).
+    Only the gateway's authorization token is stored (encrypted) — never card numbers.
+    """
+
+    parent = models.ForeignKey("parents.ParentProfile", on_delete=models.CASCADE, related_name="saved_cards")
+    gateway = models.CharField(max_length=20)
+    authorization_code = EncryptedTextField()
+    signature = models.CharField(max_length=100, blank=True)  # gateway's card fingerprint, for de-duplication
+    brand = models.CharField(max_length=30, blank=True)
+    last4 = models.CharField(max_length=4)
+    exp_month = models.CharField(max_length=2, blank=True)
+    exp_year = models.CharField(max_length=4, blank=True)
+    email = models.EmailField(blank=True)  # Paystack requires the original customer email to re-charge
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class Payment(models.Model):
     class Status(models.TextChoices):
         INITIATED = "initiated"
@@ -83,6 +105,7 @@ class Payment(models.Model):
     channel = models.CharField(max_length=30, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.INITIATED, db_index=True)
     authorization_url = models.URLField(max_length=500, blank=True)
+    saved_card = models.ForeignKey(SavedCard, null=True, blank=True, on_delete=models.SET_NULL, related_name="payments")
     raw_verification = models.JSONField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -26,6 +26,19 @@ class InvalidPayload(GatewayError):
 
 
 @dataclass
+class SavedCardInfo:
+    """A reusable card token returned by the gateway after a successful card payment. Never a card number."""
+
+    authorization_code: str
+    signature: str
+    brand: str
+    last4: str
+    exp_month: str
+    exp_year: str
+    email: str
+
+
+@dataclass
 class Verification:
     status: str  # success | failed | pending
     amount_kobo: int
@@ -91,6 +104,20 @@ class Paystack:
     def verify_transfer(self, reference):
         return self._req("GET", f"/transfer/verify/{reference}").get("status", "pending")
 
+    def saved_card(self, raw):
+        auth = (raw or {}).get("authorization") or {}
+        if not auth.get("reusable") or auth.get("channel") != "card" or not auth.get("authorization_code"):
+            return None
+        return SavedCardInfo(auth["authorization_code"], auth.get("signature", ""), (auth.get("card_type") or auth.get("brand") or "").strip().title(),
+                             auth.get("last4", ""), str(auth.get("exp_month", "")), str(auth.get("exp_year", "")),
+                             ((raw or {}).get("customer") or {}).get("email", ""))
+
+    def charge_authorization(self, *, email, amount_kobo, authorization_code, reference, metadata=None):
+        d = self._req("POST", "/transaction/charge_authorization", json={
+            "email": email, "amount": amount_kobo, "authorization_code": authorization_code, "reference": reference,
+            "currency": "NGN", "metadata": metadata or {}})
+        return {"success": "success", "failed": "failed"}.get(d.get("status"), "pending")
+
 
 class Flutterwave:
     name = "flutterwave"
@@ -153,6 +180,20 @@ class Flutterwave:
         d = self._req("GET", f"/transfers?reference={reference}")
         return (d[0]["status"].lower() if d else "pending")
 
+    def saved_card(self, raw):
+        card = (raw or {}).get("card") or {}
+        if not card.get("token"):
+            return None
+        month, _, year = str(card.get("expiry", "")).partition("/")
+        return SavedCardInfo(card["token"], f"{card.get('first_6digits', '')}{card.get('last_4digits', '')}{card.get('expiry', '')}",
+                             (card.get("type") or "").title(), card.get("last_4digits", ""), month, year,
+                             ((raw or {}).get("customer") or {}).get("email", ""))
+
+    def charge_authorization(self, *, email, amount_kobo, authorization_code, reference, metadata=None):
+        d = self._req("POST", "/tokenized-charges", json={
+            "token": authorization_code, "email": email, "amount": amount_kobo / 100, "currency": "NGN", "tx_ref": reference, "meta": metadata or {}})
+        return {"successful": "success", "failed": "failed"}.get(d.get("status"), "pending")
+
 
 class FakeGateway:
     """Local development only: simulates checkout, verification and transfers."""
@@ -164,7 +205,6 @@ class FakeGateway:
             raise GatewayError("Fake gateway is disabled outside DEBUG")
 
     def initialize(self, *, email, amount_kobo, reference, callback_url, metadata=None):
-
         return f"{settings.SITE_URL}/dev/fake-checkout?reference={reference}&amount={amount_kobo}"
 
     def verify(self, reference):
@@ -190,7 +230,6 @@ class FakeGateway:
                 {"name": "Zenith Bank", "code": "057"}, {"name": "UBA", "code": "033"}, {"name": "Opay", "code": "999992"}]
 
     def resolve_account(self, account_number, bank_code):
-
         # Account numbers ending in 0000 simulate a name mismatch; others echo the expected holder (see add_bank_account).
         return "TEST ACCOUNT" if account_number.endswith("0000") else None
 
@@ -201,6 +240,22 @@ class FakeGateway:
         return "pending"
 
     def verify_transfer(self, reference):
+        return "success"
+
+    def saved_card(self, raw):
+        if not (raw or {}).get("fake"):
+            return None
+        return SavedCardInfo("AUTH_fake", "SIG_fake_4081", "Visa", "4081", "12", "2030", "")
+
+    def charge_authorization(self, *, email, amount_kobo, authorization_code, reference, metadata=None):
+        from payments.models import Payment
+
+        # Cards whose token ends in "_declined" simulate a decline.
+        if authorization_code.endswith("_declined"):
+            return "failed"
+        p = Payment.objects.get(reference=reference)
+        p.raw_verification = {**(p.raw_verification or {}), "fake_paid": True}
+        p.save(update_fields=["raw_verification"])
         return "success"
 
 

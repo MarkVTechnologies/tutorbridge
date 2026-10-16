@@ -7,13 +7,14 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from bookings.models import Booking, BookingStatus, EscrowStatus, Lesson, LessonStatus
 from core import config
 from core.audit import audit
+from core.money import naira
 from matching.engine import _minutes, _parse_time, week_dates
 from messaging.notify import notify
 from payments import ledger
@@ -66,9 +67,12 @@ def quote(*, parent, tutor, package_size, lesson_minutes, request=None):
 def find_conflicts(tutor, slots, exclude_booking=None):
     """BKG-02: no overlapping lessons for a tutor, including a travel buffer either side."""
     buffer = timedelta(minutes=config.get("travel_buffer_minutes"))
-    stale_unpaid = timezone.now() - timedelta(hours=1)
+    now = timezone.now()
+    # Unpaid checkouts hold the tutor's time for an hour; unpaid renewals hold it for the renewal payment window.
+    stale_unpaid = Q(booking__renews__isnull=True, booking__created_at__lt=now - timedelta(hours=1)) | Q(
+        booking__renews__isnull=False, booking__created_at__lt=now - timedelta(hours=config.get("renewal_payment_hours")))
     qs = Lesson.objects.filter(tutor=tutor, status__in=ACTIVE_LESSON_STATES, booking__status__in=HOLDING_BOOKING_STATES).exclude(
-        booking__status=BookingStatus.AWAITING_PAYMENT, booking__created_at__lt=stale_unpaid
+        Q(booking__status=BookingStatus.AWAITING_PAYMENT) & stale_unpaid
     )
     if exclude_booking is not None:
         qs = qs.exclude(booking=exclude_booking)
@@ -164,6 +168,11 @@ def fund_booking(booking):
     booking.status = BookingStatus.OFFERED
     booking.offer_expires_at = timezone.now() + timedelta(hours=hours)
     booking.save(update_fields=["status", "offer_expires_at"])
+    if booking.renews_id:
+        # A renewal continues an existing arrangement with the same tutor and slots: no new offer needed.
+        booking = tutor_accept(booking, booking.tutor, notify_parent=False)
+        _renewal_notify(booking)
+        return booking
     _offer_notify(booking)
     if booking.request_id:
         from matching.models import Match, MatchStatus, RequestStatus
@@ -183,7 +192,7 @@ def _offer_notify(booking):
 
 
 @transaction.atomic
-def tutor_accept(booking, tutor):
+def tutor_accept(booking, tutor, notify_parent=True):
     booking = Booking.objects.select_for_update().get(pk=booking.pk)
     if booking.tutor_id != tutor.pk or booking.status != BookingStatus.OFFERED:
         raise ValidationError("This booking is no longer available.")
@@ -191,8 +200,15 @@ def tutor_accept(booking, tutor):
     booking.save(update_fields=["status", "accepted_at"])
     from messaging.models import Thread
 
-    Thread.objects.get_or_create(booking=booking)
+    previous_thread = Thread.objects.filter(booking_id=booking.renews_id).first() if booking.renews_id else None
+    if previous_thread is not None:
+        # Keep one conversation per family and tutor across renewals.
+        Thread.objects.filter(pk=previous_thread.pk).update(booking=booking)
+    else:
+        Thread.objects.get_or_create(booking=booking)
     first = booking.lessons.order_by("scheduled_start").first()
+    if not notify_parent:
+        return booking
     notify(booking.parent.user, "booking_confirmed", {
         "tutor_name": tutor.user.display_name,
         "first_lesson": timezone.localtime(first.scheduled_start).strftime("%a %d %b, %H:%M") if first else "",
@@ -507,9 +523,12 @@ def expire_offers():
 
 
 def expire_unpaid():
-    cutoff = timezone.now() - timedelta(hours=2)
+    now = timezone.now()
     n = 0
-    for b in Booking.objects.filter(status=BookingStatus.AWAITING_PAYMENT, created_at__lt=cutoff):
+    stale = Booking.objects.filter(status=BookingStatus.AWAITING_PAYMENT).filter(
+        Q(renews__isnull=True, created_at__lt=now - timedelta(hours=2))
+        | Q(renews__isnull=False, created_at__lt=now - timedelta(hours=config.get("renewal_payment_hours"))))
+    for b in stale:
         b.lessons.filter(status=LessonStatus.SCHEDULED).update(status=LessonStatus.CANCELLED, cancel_reason="Unpaid", escrow_status=EscrowStatus.REFUNDED)
         b.status, b.cancel_reason = BookingStatus.CANCELLED, "Payment not completed"
         b.save(update_fields=["status", "cancel_reason"])
@@ -584,3 +603,85 @@ def _alert_ops(title, detail):
 
     for u in User.objects.filter(role__in=[Role.OPS], is_active=True):
         notify(u, "finance_alert", {"title": title, "detail": detail}, force_channels=("inapp",))
+
+
+# --- Package auto-renewal (BKG-06) ------------------------------------------
+
+
+def renew_due_packages():
+    """Renew auto-renewing packages that are down to their last lesson(s). Run hourly by cron."""
+    trigger = config.get("renewal_trigger_lessons_left")
+    live = [BookingStatus.AWAITING_PAYMENT, BookingStatus.OFFERED, BookingStatus.ACTIVE, BookingStatus.COMPLETED]
+    due = (Booking.objects.filter(auto_renew=True, is_trial=False, status=BookingStatus.ACTIVE)
+           .exclude(renewals__status__in=live)
+           .select_related("parent__user", "tutor__user", "child"))
+    renewed = []
+    for booking in due:
+        if booking.lessons.filter(status=LessonStatus.SCHEDULED).count() <= trigger:
+            new = renew_package(booking)
+            if new is not None:
+                renewed.append(new)
+    return renewed
+
+
+def renew_package(booking):
+    """
+    Book the same tutor, child, subjects and weekly slots again, starting the day after the last lesson,
+    at the tutor's current rate. Pay from the wallet first, then the saved card; otherwise hold the
+    slots and ask the parent to pay. Returns the new booking, or None if it couldn't be created.
+    """
+    from payments.models import Payment, SavedCard
+
+    parent = booking.parent
+    ctx = {"child_name": booking.child.first_name, "tutor_name": booking.tutor.user.display_name}
+    last = booking.lessons.order_by("-scheduled_start").first()
+    start = max(timezone.localtime(last.scheduled_start).date() + timedelta(days=1), timezone.localdate() + timedelta(days=1))
+    try:
+        new = create_booking(
+            parent=parent, tutor=booking.tutor, child=booking.child, subjects=list(booking.subjects.all()),
+            package_size=booking.package_size, lesson_minutes=booking.lesson_minutes, schedule=booking.schedule, start_date=start,
+            address=booking.address, area=booking.area, is_online=booking.is_online,
+        )
+    except ValidationError as e:
+        booking.auto_renew = False
+        booking.save(update_fields=["auto_renew"])
+        detail = e.detail
+        reason = "; ".join(str(v) for v in detail.values()) if isinstance(detail, dict) else " ".join(str(v) for v in detail) if isinstance(detail, list) else str(detail)
+        notify(parent.user, "renewal_failed", {**ctx, "reason": reason[:200]}, link=f"/parent/bookings/{booking.pk}")
+        return None
+    new.renews, new.auto_renew = booking, True
+    new.save(update_fields=["renews", "auto_renew"])
+
+    due = new.total_kobo - ledger.balance(ledger.wallet(parent))
+    if due <= 0:
+        fund_booking(new)
+        return new
+    card = SavedCard.objects.filter(parent=parent, is_active=True).first()
+    reason = "no saved card on file"
+    if card is not None:
+        payment = pay.charge_saved_card(parent, card, due, booking=new)
+        if payment.status == Payment.Status.SUCCESS:
+            return new  # credit_payment -> fund_booking -> auto-accepted and notified
+        if payment.status == Payment.Status.FAILED:
+            reason = f"your {card.brand or 'card'} ending {card.last4} was declined"
+        else:
+            reason = "the card payment is still processing"
+    notify(parent.user, "renewal_payment_needed", {
+        **ctx, "lessons": new.package_size, "amount": naira(due), "hours": config.get("renewal_payment_hours"), "reason": reason,
+        "link": f"/parent/bookings/{new.pk}",
+    }, link=f"/parent/bookings/{new.pk}")
+    return new
+
+
+def _renewal_notify(booking):
+    first = booking.lessons.order_by("scheduled_start").first()
+    when = timezone.localtime(first.scheduled_start).strftime("%a %d %b") if first else ""
+    card_payment = booking.payments.filter(saved_card__isnull=False, status="success").select_related("saved_card").first()
+    if card_payment:
+        paid_with = f"We charged your {card_payment.saved_card.brand or 'card'} ending {card_payment.saved_card.last4}."
+    else:
+        paid_with = "Paid from your wallet balance."
+    ctx = {"child_name": booking.child.first_name, "tutor_name": booking.tutor.user.display_name, "lessons": booking.package_size, "first_lesson": when}
+    notify(booking.parent.user, "package_renewed", {**ctx, "paid_with": paid_with}, link=f"/parent/bookings/{booking.pk}")
+    notify(booking.tutor.user, "tutor_package_renewed", ctx, link=f"/tutor/bookings/{booking.pk}")
+

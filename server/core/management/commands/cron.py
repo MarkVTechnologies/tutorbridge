@@ -38,9 +38,10 @@ def five():
 
 
 def hourly():
-    from bookings.services import auto_confirm
+    from bookings.services import auto_confirm, renew_due_packages
 
     auto_confirm()
+    renew_due_packages()
 
 
 def daily():

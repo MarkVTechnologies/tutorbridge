@@ -55,6 +55,8 @@ class BookingSerializer(serializers.ModelSerializer):
     next_lesson = serializers.SerializerMethodField()
     lessons_done = serializers.SerializerMethodField()
     thread_id = serializers.SerializerMethodField()
+    renewed_by = serializers.SerializerMethodField()
+    amount_due_kobo = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -63,6 +65,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "is_trial", "package_size", "lesson_minutes", "schedule", "start_date", "hourly_rate_kobo", "lesson_price_kobo",
             "matching_fee_kobo", "matching_credit_kobo", "total_kobo", "area_name", "address_visible", "is_online", "online_link",
             "offer_expires_at", "accepted_at", "auto_renew", "next_lesson", "lessons_done", "thread_id", "created_at",
+            "renews", "renewed_by", "amount_due_kobo",
         ]
 
     def get_subject_names(self, obj):
@@ -85,6 +88,19 @@ class BookingSerializer(serializers.ModelSerializer):
     def get_thread_id(self, obj):
         t = getattr(obj, "thread", None)
         return t.pk if t else None
+
+    def get_renewed_by(self, obj):
+        live = ["awaiting_payment", "offered", "active", "completed"]
+        r = obj.renewals.filter(status__in=live).order_by("-created_at").first()
+        return r.pk if r else None
+
+    def get_amount_due_kobo(self, obj):
+        """What the parent still has to pay for an unpaid booking, after wallet credit."""
+        if obj.status != "awaiting_payment":
+            return 0
+        from payments import ledger
+
+        return max(0, obj.total_kobo - ledger.balance(ledger.wallet(obj.parent)))
 
 
 class CreateBookingSerializer(serializers.Serializer):

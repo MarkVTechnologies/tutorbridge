@@ -19,7 +19,7 @@ from core.throttles import OTPThrottle, PaymentThrottle
 from messaging.notify import notify
 from payments import ledger, services
 from payments.gateways import GATEWAYS, FakeGateway, GatewayError, InvalidPayload, get_gateway
-from payments.models import AccountKind, BankAccount, LedgerEntry, Payment, PayoutItem
+from payments.models import AccountKind, BankAccount, LedgerEntry, Payment, PayoutItem, SavedCard
 from tutors.services import check
 from vetting.models import CheckStatus, CheckType
 
@@ -114,7 +114,22 @@ def wallet(request):
         "in_escrow_kobo": escrow_total,
         "entries": [{"date": e.created_at, "description": e.transaction.description, "kind": e.transaction.kind,
                      "amount_kobo": e.credit_kobo - e.debit_kobo} for e in entries],
+        "saved_cards": [{"id": c.pk, "brand": c.brand, "last4": c.last4, "exp_month": c.exp_month, "exp_year": c.exp_year, "added": c.created_at}
+                        for c in SavedCard.objects.filter(parent=parent, is_active=True)],
     })
+
+
+@api_view(["DELETE"])
+@permission_classes([IsParent])
+def remove_saved_card(request, pk):
+    """Parents can withdraw consent to automatic charges at any time."""
+    card = get_object_or_404(SavedCard, pk=pk, parent__user=request.user, is_active=True)
+    card.is_active = False
+    card.save(update_fields=["is_active"])
+    from core.audit import audit
+
+    audit(request.user, "card.remove", "saved_card", card.pk, request=request)
+    return Response(status=204)
 
 
 # --- Tutor earnings (OUT-01) ----------------------------------------------

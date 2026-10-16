@@ -102,6 +102,7 @@ api = [
     path("payments/<str:reference>/", payments.payment_status),
     path("payments/<str:reference>/receipt/", payments.receipt),
     path("wallet/", payments.wallet),
+    path("saved-cards/<int:pk>/", payments.remove_saved_card),
     path("earnings/", payments.earnings),
     path("earnings/statement/", payments.statement),
     path("banks/", payments.banks),

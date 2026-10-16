@@ -140,6 +140,21 @@ class BookingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
         audit(request.user, "booking.replacement_requested", "booking", booking.pk, reason=request.data.get("reason", ""))
         return Response({"detail": "Thanks — our team will be in touch shortly with a replacement tutor."})
 
+    @action(detail=True, methods=["post"], permission_classes=[IsParent, IsVerifiedUser], throttle_classes=[PaymentThrottle])
+    def pay(self, request, pk=None):
+        """Pay for a booking that's still awaiting payment (an unpaid renewal, or an abandoned checkout)."""
+        booking = self.get_object()
+        if booking.status != BookingStatus.AWAITING_PAYMENT:
+            raise ValidationError("This booking doesn't need payment.")
+        due = booking.total_kobo - ledger.balance(ledger.wallet(booking.parent))
+        if due <= 0:
+            services.pay_from_wallet(booking)
+            booking.refresh_from_db()
+            return Response({"booking": self.get_serializer(booking).data, "payment": None})
+        payment = pay.start_checkout(booking.parent, due, booking=booking)
+        return Response({"booking": self.get_serializer(booking).data,
+                         "payment": {"reference": payment.reference, "amount_kobo": due, "authorization_url": payment.authorization_url}})
+
     @action(detail=True, methods=["patch"], url_path="auto-renew", permission_classes=[IsParent])
     def auto_renew(self, request, pk=None):
         booking = self.get_object()
