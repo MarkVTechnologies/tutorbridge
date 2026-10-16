@@ -12,6 +12,12 @@ UI is a React app that talks to a Django JSON API on the **same origin** (sessio
 exactly as server-rendered pages would). It is built locally and served by Django/WhiteNoise or
 Apache, so cPanel still only needs Python.
 
+## Live demo
+
+https://tutorbridge-demo.vercel.app: the React site on Vercel, which proxies `/api` to the Django API on Railway
+(MySQL, `DEMO_MODE=1`, simulated payments, emails/SMS written to the server log). Demo accounts are seeded on every
+deploy by `seed_demo`. Staff accounts share a pre-enrolled 2FA key (Railway variable `DEMO_STAFF_TOTP_SECRET`).
+
 ## Run locally
 
 ```bash
