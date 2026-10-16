@@ -12,6 +12,7 @@ from payments import views as payments
 from trust import views as trust
 from tutors import views as tutors
 from vetting import views as vetting
+from website import staff_views as website_staff
 from website import views as website
 
 router = DefaultRouter(trailing_slash=True)
@@ -174,6 +175,10 @@ api = [
     path("staff/areas/", bo.area_create),
     path("staff/audit/", bo.audit_log),
     path("staff/promos/", bo.promos),
+    path("staff/content/faqs/", website_staff.faqs),
+    path("staff/content/faqs/<int:pk>/", website_staff.faq_detail),
+    path("staff/content/posts/", website_staff.posts),
+    path("staff/content/posts/<int:pk>/", website_staff.post_detail),
     path("staff/promos/<int:pk>/", bo.promo_update),
     path("staff/exports/<str:name>/", bo.export_csv),
     path("", include(router.urls)),

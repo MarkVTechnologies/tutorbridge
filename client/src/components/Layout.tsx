@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRight, Banknote, Bell, BookOpen, CalendarDays, ChevronDown, ClipboardCheck, FileBarChart, Gavel, GraduationCap, Inbox, LayoutDashboard,
+  ArrowRight, Banknote, Bell, FileText, BookOpen, CalendarDays, ChevronDown, ClipboardCheck, FileBarChart, Gavel, GraduationCap, Inbox, LayoutDashboard,
   ListChecks, LogOut, Mail, MapPin, Menu, MessageSquare, MessageSquareWarning, Phone, ScrollText, Search, Settings, ShieldCheck, Siren, Star,
   Tag, UserRound, Users, Video, Wallet, X, Baby, type LucideIcon,
 } from "lucide-react";
@@ -233,6 +233,7 @@ const appNav: Record<"parent" | "tutor" | "staff", NavGroup[]> = {
     ] },
     { title: "Admin", items: [
       { to: "/staff/users", label: "Users", icon: Users, show: (m) => hasPerm(m, "users.view") },
+      { to: "/staff/content", label: "Website content", icon: FileText, show: (m) => hasPerm(m, "content.manage") },
       { to: "/staff/settings", label: "Settings", icon: Settings, show: (m) => hasPerm(m, "users.view") },
       { to: "/staff/team", label: "Staff accounts", icon: ShieldCheck, show: (m) => hasPerm(m, "staff.manage") },
       { to: "/staff/audit", label: "Audit log", icon: ScrollText, show: (m) => hasPerm(m, "audit.view") },

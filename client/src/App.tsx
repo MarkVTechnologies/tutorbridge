@@ -28,6 +28,7 @@ const finance = () => import("@/pages/staff/Finance");
 const safety = () => import("@/pages/staff/Safety");
 const admin = () => import("@/pages/staff/Admin");
 const promos = () => import("@/pages/staff/Promos");
+const contentStaff = () => import("@/pages/staff/Content");
 
 function ErrorPage() {
   const err = useRouteError() as { status?: number; message?: string };
@@ -127,6 +128,7 @@ const router = createBrowserRouter([
           { path: "payouts", element: page(finance, "Payouts") },
           { path: "payouts/:id", element: page(finance, "PayoutDetail") },
           { path: "promos", element: page(promos, "Promos") },
+          { path: "content", element: page(contentStaff, "ContentManager") },
           { path: "disputes", element: page(safety, "Disputes") },
           { path: "incidents", element: page(safety, "Incidents") },
           { path: "incidents/:id", element: page(safety, "Incidents") },

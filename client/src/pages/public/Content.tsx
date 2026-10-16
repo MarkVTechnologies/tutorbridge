@@ -3,7 +3,7 @@ import { motion } from "@/lib/motion";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { Prose } from "@/components/Layout";
+import { Markdown } from "@/components/Markdown";
 import { CtaBand, FaqAccordion, PageHero } from "@/components/marketing";
 import { Seo } from "@/components/Seo";
 import { Alert, Button, ButtonLink, Card, EmptyState, ErrorAlert, IconTile, Input, Loading, Reveal, Select, Tabs, Textarea } from "@/components/ui";
@@ -117,7 +117,7 @@ export function BlogPost() {
       <Seo title={data.title} />
       <PageHero eyebrow={dateOnly(data.published_at)} title={data.title} />
       <article className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-        <Prose>{data.body.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>)}</Prose>
+        <Markdown text={data.body} />
       </article>
       <CtaBand title="Find a vetted tutor near you." subtitle="Shortlist within 24 hours." primary={{ to: "/signup?role=parent", label: "Request a tutor" }} />
     </>
